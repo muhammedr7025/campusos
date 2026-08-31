@@ -1,0 +1,15 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: campusos
+      POSTGRES_PASSWORD: campusos
+      POSTGRES_DB: campusos
+    ports:
+      - "5432:5432"
+    volumes:
+      - campusos_pgdata:/var/lib/postgresql/data
+
+volumes:
+  campusos_pgdata:

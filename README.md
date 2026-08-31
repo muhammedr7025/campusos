@@ -1,36 +1,63 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CampusOS
 
-## Getting Started
+Multi-tenant, white-label institute operations platform — lead → follow-up → admission (KYC) → fees → academics (timetable/attendance/assignments), across six role-based portals (Super Admin, Finance, Counselor/CRM, Admission Officer, Teacher, Student/Parent).
 
-First, run the development server:
+Built from [`docs/Institute-Management-Platform-PRD.md`](docs/Institute-Management-Platform-PRD.md) and [`docs/Dev-Build-Prompt-Institute-Platform.md`](docs/Dev-Build-Prompt-Institute-Platform.md).
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Stack
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Next.js 16 (App Router, TypeScript strict) · shadcn/ui (Radix-nova) + Tailwind v4 · React Hook Form + Zod · TanStack Table v8 · Recharts · Auth.js v5 (Credentials + JWT) · Prisma 7 + PostgreSQL · `sonner` toasts · `next-themes` dark mode · `cmdk` command palette.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Getting started
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. **Database** — needs a local Postgres. Two options:
+   - `docker compose up -d db` (uses `docker-compose.yml`, matches the `.env` default), **or**
+   - Point `DATABASE_URL` in `.env` at any Postgres instance you already have (e.g. `brew services start postgresql@16`), and create a matching role/database.
+2. **Install deps**: `npm install`
+3. **Migrate + seed**:
+   ```bash
+   npx prisma migrate dev
+   npx prisma db seed
+   ```
+   Seeds two demo tenants (`acme` and `nova`) with distinct branding, one user per role in each, and a small sample dataset (batch/course/division, a converted lead → student with KYC + fee plan + a logged payment).
+4. **Run**: `npm run dev` → http://localhost:3000
 
-## Learn More
+## Multi-tenant access in dev
 
-To learn more about Next.js, take a look at the following resources:
+Tenants are resolved by subdomain. Modern browsers resolve `*.localhost` to loopback, so:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- **Acme Institute**: http://acme.localhost:3000
+- **Nova Learning Academy**: http://nova.localhost:3000
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+If your browser/tooling doesn't support that, append `?tenant=acme` once — it's saved to a cookie for subsequent requests.
 
-## Deploy on Vercel
+**Seeded logins** (same pattern for both tenants, password `password123`):
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| Role | Email (acme) | Email (nova) |
+|---|---|---|
+| Super Admin | admin@acme.test | admin@nova.test |
+| Finance | finance@acme.test | finance@nova.test |
+| Counselor | counselor@acme.test | counselor@nova.test |
+| Admission Officer | admissions@acme.test | admissions@nova.test |
+| Teacher | teacher@acme.test | teacher@nova.test |
+| Student | student@acme.test | student@nova.test |
+| Parent | parent@acme.test | parent@nova.test |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Project structure
+
+- `app/{admin,finance,crm,admissions,teacher,portal}/` — one literal URL-prefixed folder per role (not Next.js route groups — see note below), each behind `middleware.ts` role gating.
+- `app/(auth)/login` — the one real route group, kept parenthesized so `/login` has no prefix.
+- `lib/rbac/` — `permissions.ts` (config-table RBAC, edge-safe), `guard.ts` (`requireRole`/`requirePermission`, the layer that actually enforces access).
+- `lib/tenant.ts` + `middleware.ts` — tenant resolution; every query goes through `getTenantId()`.
+- `lib/storage/`, `lib/notifications/` — provider-agnostic interfaces (local filesystem / in-app DB are the only real V1 implementations; swap in S3/R2/SMS/WhatsApp later without touching call sites).
+- `lib/fees/balance.ts` — fee balance is always derived (`total − Σpayments`), never a stored editable field.
+- `prisma/schema.prisma` — full data model; `prisma/seed.ts` — demo data.
+
+**Why plain folders instead of Next.js route groups for the six portals:** `(admin)/dashboard` and `(finance)/dashboard` are both route groups, which are transparent to the URL — they'd collide at the same `/dashboard` path. Real folders (`admin/`, `finance/`, …) give each portal its own URL prefix, which is what the middleware and nav links assume throughout.
+
+## Known V1 scope decisions
+
+- **No payment gateway, LMS, biometric attendance, exam/report cards, or alumni module** — explicit non-goals per the dev prompt.
+- **SMS/WhatsApp notifications**: stubbed via the `NotificationProvider` interface; only the in-app (DB-backed) implementation is wired up, per the PRD's note that this is a client budget decision.
+- **Time-based notification triggers** (fee due/overdue reminders, follow-up-due reminders, KYC-pending reminders) are surfaced as computed/filtered views in the relevant dashboards rather than pushed proactively — there's no background job scheduler in this build. Event-triggered notifications (assignment posted/graded, attendance-drop-on-marking) fire immediately.
+- **Portal account provisioning**: student/parent accounts are created automatically at admission with a generated temp password shown once in the UI (no email/SMS delivery wired up yet — swap in a real provider before production use).
