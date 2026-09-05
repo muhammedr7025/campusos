@@ -6,6 +6,7 @@ import { Role } from "@/generated/prisma/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/layout/empty-state";
+import { PageHeader } from "@/components/layout/page-header";
 import { TimetableFormDialog } from "@/components/admin/timetable/timetable-form-dialog";
 import { DeleteSlotButton } from "@/components/admin/timetable/delete-slot-button";
 import { DAY_LABELS } from "@/lib/validators/timetable";
@@ -27,13 +28,12 @@ export default async function AdminTimetablePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Timetable</h1>
-          <p className="text-muted-foreground text-sm">Weekly schedule across all divisions.</p>
-        </div>
-        <TimetableFormDialog divisions={divisions} subjects={subjects} teachers={teachers} />
-      </div>
+      <PageHeader
+        crumb="Academics"
+        title="Timetable"
+        description="Weekly schedule across all divisions."
+        actions={<TimetableFormDialog divisions={divisions} subjects={subjects} teachers={teachers} />}
+      />
 
       {entries.length === 0 ? (
         <EmptyState icon={CalendarDays} title="No timetable slots yet" description="Add the first class slot." />

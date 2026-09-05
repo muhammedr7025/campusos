@@ -17,7 +17,7 @@ function contrastForeground(hex: string): string {
   const b = parseInt(normalized.slice(5, 7), 16) / 255;
   const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
   const luminance = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
-  return luminance > 0.45 ? "#0a0a0a" : "#fafafa";
+  return luminance > 0.45 ? "#10151A" : "#F5F3EE";
 }
 
 /**
@@ -46,9 +46,11 @@ export function buildTenantThemeCss(tenant: Pick<Tenant, "primaryColor" | "secon
     vars.push(`--secondary-foreground: ${contrastForeground(tenant.secondaryColor)};`);
   }
   if (isValidHex(tenant.accentColor)) {
-    vars.push(`--accent: ${tenant.accentColor};`);
-    vars.push(`--accent-foreground: ${contrastForeground(tenant.accentColor)};`);
-    vars.push(`--chart-1: ${tenant.accentColor};`);
+    // Deliberately NOT --accent itself — that token drives subtle hover/
+    // highlight washes (menu items, selected states) and needs to stay a
+    // soft neutral regardless of a tenant's brand color. accentColor instead
+    // feeds the secondary chart series and one-off highlight badges.
+    vars.push(`--chart-2: ${tenant.accentColor};`);
   }
   if (tenant.fontFamily) {
     // Stored as a full CSS font-family stack, e.g. "'Poppins', sans-serif".

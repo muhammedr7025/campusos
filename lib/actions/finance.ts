@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getTenantId } from "@/lib/tenant";
 import { requirePermission } from "@/lib/rbac/guard";
 import { writeAuditLog } from "@/lib/audit";
+import { notifier } from "@/lib/notifications";
 import {
   feeStructureSchema,
   paymentSchema,
@@ -277,6 +278,50 @@ export async function deleteFeeStructure(feeStructureId: string): Promise<Action
     });
 
     revalidatePath("/finance/fee-structures");
+    return { ok: true, data: undefined };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function sendFeeReminder(studentId: string): Promise<ActionResult> {
+  try {
+    const session = await requirePermission("payment:create");
+    const tenantId = await getTenantId();
+
+    const student = await prisma.student.findFirstOrThrow({
+      where: { id: studentId, tenantId },
+      include: { user: true, guardians: { include: { guardian: { include: { user: true } } } } },
+    });
+
+    const recipients = [
+      student.user?.id,
+      ...student.guardians.map((sg) => sg.guardian.user?.id).filter((id): id is string => !!id),
+    ].filter((id): id is string => !!id);
+
+    await Promise.all(
+      recipients.map((recipientId) =>
+        notifier.send(tenantId, recipientId, "FEE_OVERDUE", {
+          title: "Fee reminder",
+          body: `A payment reminder was sent for ${student.name}'s outstanding fee balance.`,
+          relatedEntityType: "Student",
+          relatedEntityId: student.id,
+        }),
+      ),
+    );
+
+    await prisma.auditLog.create({
+      data: {
+        tenantId,
+        actorId: session.user.id,
+        action: "CREATE",
+        entityType: "Reminder",
+        entityId: student.id,
+        diff: { studentName: student.name },
+      },
+    });
+
+    revalidatePath("/finance/reminders");
     return { ok: true, data: undefined };
   } catch (error) {
     return actionError(error);

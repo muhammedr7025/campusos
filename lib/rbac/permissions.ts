@@ -62,6 +62,12 @@ export const PERMISSIONS = {
 
   "submission:create": [ROLE_VALUES.STUDENT],
 
+  "discount:request": [ROLE_VALUES.SUPER_ADMIN, ROLE_VALUES.FINANCE],
+  "discount:decide": [ROLE_VALUES.SUPER_ADMIN],
+  "announcement:manage": [ROLE_VALUES.SUPER_ADMIN],
+  "note:manage": [ROLE_VALUES.SUPER_ADMIN, ROLE_VALUES.TEACHER],
+  "exam:manage": [ROLE_VALUES.SUPER_ADMIN, ROLE_VALUES.TEACHER],
+
   "portal:view": [ROLE_VALUES.STUDENT, ROLE_VALUES.PARENT],
 } as const satisfies Record<string, Role[]>;
 

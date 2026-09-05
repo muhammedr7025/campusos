@@ -3,6 +3,7 @@ import { getTenantId } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
 import { Role } from "@/generated/prisma/client";
 import { StudentsTable, type StudentRow } from "@/components/admissions/students-table";
+import { PageHeader } from "@/components/layout/page-header";
 
 export default async function StudentsPage() {
   await requireRole(Role.SUPER_ADMIN, Role.ADMISSION_OFFICER);
@@ -25,10 +26,7 @@ export default async function StudentsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Students</h1>
-        <p className="text-muted-foreground text-sm">Every enrolled student at this institute.</p>
-      </div>
+      <PageHeader crumb="Admissions" title="Admitted students" description="Every enrolled student at this institute." />
       <StudentsTable students={rows} />
     </div>
   );

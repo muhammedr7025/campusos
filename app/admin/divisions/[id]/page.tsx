@@ -8,6 +8,7 @@ import { Role } from "@/generated/prisma/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/layout/empty-state";
+import { PageHeader } from "@/components/layout/page-header";
 import { DivisionFormDialog } from "@/components/admin/divisions/division-form-dialog";
 
 export default async function DivisionDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -32,19 +33,17 @@ export default async function DivisionDetailPage({ params }: { params: Promise<{
         <ArrowLeft className="size-4" /> Back to divisions
       </Link>
 
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{division.name}</h1>
-          <p className="text-muted-foreground text-sm">
-            {division.course.name} · {division.students.length}
-            {division.capacity != null ? ` / ${division.capacity}` : ""} students
-          </p>
-        </div>
-        <DivisionFormDialog
-          courses={courses}
-          division={{ id: division.id, courseId: division.courseId, name: division.name, capacity: division.capacity }}
-        />
-      </div>
+      <PageHeader
+        crumb="Academics"
+        title={division.name}
+        description={`${division.course.name} · ${division.students.length}${division.capacity != null ? ` / ${division.capacity}` : ""} students`}
+        actions={
+          <DivisionFormDialog
+            courses={courses}
+            division={{ id: division.id, courseId: division.courseId, name: division.name, capacity: division.capacity }}
+          />
+        }
+      />
 
       <div>
         <h2 className="mb-3 text-lg font-semibold">Enrolled students</h2>

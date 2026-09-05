@@ -5,7 +5,14 @@ import { prisma } from "@/lib/prisma";
 import { getTenantId } from "@/lib/tenant";
 import { requirePermission } from "@/lib/rbac/guard";
 import { writeAuditLog } from "@/lib/audit";
-import { leadSchema, followUpSchema, leadStageSchema, lostLeadSchema } from "@/lib/validators/leads";
+import {
+  leadSchema,
+  followUpSchema,
+  leadStageSchema,
+  lostLeadSchema,
+  bulkImportSchema,
+  type BulkImportRow,
+} from "@/lib/validators/leads";
 import { actionError, type ActionResult } from "@/lib/actions/types";
 
 export async function createLead(input: unknown): Promise<ActionResult<{ id: string }>> {
@@ -201,6 +208,79 @@ export async function deleteLead(leadId: string): Promise<ActionResult> {
 
     revalidatePath("/crm/leads");
     return { ok: true, data: undefined };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export type BulkImportResult = { imported: number; skipped: number };
+
+/**
+ * Re-validates dedupe server-side rather than trusting the client's preview
+ * — a phone number could have been captured by someone else between the
+ * user pasting the sheet and hitting import.
+ */
+export async function bulkImportLeads(input: unknown): Promise<ActionResult<BulkImportResult>> {
+  try {
+    const session = await requirePermission("lead:manage");
+    const tenantId = await getTenantId();
+    const data = bulkImportSchema.parse(input);
+
+    const [existingLeads, existingStudents, courses] = await Promise.all([
+      prisma.lead.findMany({ where: { tenantId }, select: { phone: true } }),
+      prisma.student.findMany({ where: { tenantId }, select: { phone: true } }),
+      prisma.course.findMany({ where: { tenantId }, select: { id: true, name: true } }),
+    ]);
+
+    const digitsOf = (v: string) => v.replace(/[^0-9]/g, "");
+    const knownPhones = new Set(
+      [...existingLeads, ...existingStudents].map((x) => digitsOf(x.phone ?? "")).filter((d) => d.length > 5),
+    );
+
+    const seenInBatch = new Set<string>();
+    const toCreate: { name: string; phone: string; interestedCourseId: string | null; source: BulkImportRow["source"] }[] = [];
+    let skipped = 0;
+
+    for (const row of data.rows) {
+      const digits = digitsOf(row.phone);
+      if (digits.length < 10 || knownPhones.has(digits) || seenInBatch.has(digits)) {
+        skipped += 1;
+        continue;
+      }
+      seenInBatch.add(digits);
+      const course = row.courseName ? courses.find((c) => c.name.toLowerCase() === row.courseName!.toLowerCase()) : undefined;
+      toCreate.push({ name: row.name, phone: row.phone, interestedCourseId: course?.id ?? null, source: row.source });
+    }
+
+    if (toCreate.length === 0) {
+      return { ok: true, data: { imported: 0, skipped } };
+    }
+
+    await prisma.$transaction(async (tx) => {
+      for (const row of toCreate) {
+        await tx.lead.create({
+          data: {
+            tenantId,
+            name: row.name,
+            phone: row.phone,
+            source: row.source,
+            interestedCourseId: row.interestedCourseId,
+            assignedCounselorId: session.user.id,
+          },
+        });
+      }
+      await writeAuditLog(tx, {
+        tenantId,
+        actorId: session.user.id,
+        action: "IMPORTED",
+        entityType: "Lead",
+        entityId: "bulk",
+        diff: { imported: toCreate.length, skipped },
+      });
+    });
+
+    revalidatePath("/crm/leads");
+    return { ok: true, data: { imported: toCreate.length, skipped } };
   } catch (error) {
     return actionError(error);
   }

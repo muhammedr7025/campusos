@@ -3,10 +3,11 @@ import { getTenantId } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
 import { Role } from "@/generated/prisma/client";
 import { getFeeSummaryForTenant } from "@/lib/fees/balance";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EnrollmentTrendChart } from "@/components/admin/reports/enrollment-trend-chart";
 import { CollectionChart } from "@/components/admin/reports/collection-chart";
 import { AttendanceTrendChart } from "@/components/admin/reports/attendance-trend-chart";
+import { PageHeader } from "@/components/layout/page-header";
+import { StatCard } from "@/components/layout/stat-card";
 
 export default async function ReportsPage() {
   await requireRole(Role.SUPER_ADMIN);
@@ -57,24 +58,12 @@ export default async function ReportsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Reports</h1>
-        <p className="text-muted-foreground text-sm">Institute-wide trends.</p>
-      </div>
+      <PageHeader crumb="Institute" title="Reports" description="Institute-wide trends." />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-muted-foreground text-sm font-medium">Total students</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl font-bold">{students.length}</div></CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-muted-foreground text-sm font-medium">Lead → admission rate</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl font-bold">{conversionRate}%</div></CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-muted-foreground text-sm font-medium">Total leads</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl font-bold">{totalLeads}</div></CardContent>
-        </Card>
+        <StatCard label="Total students" value={students.length} />
+        <StatCard label="Lead → admission rate" value={`${conversionRate}%`} />
+        <StatCard label="Total leads" value={totalLeads} />
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">

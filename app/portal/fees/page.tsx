@@ -7,6 +7,7 @@ import { getCurrentFeePlanForStudent } from "@/lib/fees/balance";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/layout/empty-state";
+import { PageHeader } from "@/components/layout/page-header";
 import { ChildSwitcher } from "@/components/portal/child-switcher";
 
 export default async function PortalFeesPage() {
@@ -23,13 +24,12 @@ export default async function PortalFeesPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Fees</h1>
-          <p className="text-muted-foreground text-sm">Payment status and upcoming dues.</p>
-        </div>
-        <ChildSwitcher students={students} activeStudentId={activeStudentId} />
-      </div>
+      <PageHeader
+        crumb="Account"
+        title="Fees & receipts"
+        description="Payment status and upcoming dues."
+        actions={<ChildSwitcher students={students} activeStudentId={activeStudentId} />}
+      />
 
       {!detail ? (
         <EmptyState icon={Wallet} title="No fee plan set up yet" />

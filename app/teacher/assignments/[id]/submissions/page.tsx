@@ -42,7 +42,7 @@ export default async function AssignmentSubmissionsPage({ params }: { params: Pr
 
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold">{assignment.title}</h1>
+          <h1 className="font-heading text-2xl">{assignment.title}</h1>
           <p className="text-muted-foreground text-sm">
             {assignment.division.course.name} · {assignment.division.name} · {assignment.subject.name} · Due {assignment.dueDate.toLocaleDateString()}
           </p>

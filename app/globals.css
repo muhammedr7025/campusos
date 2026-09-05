@@ -9,7 +9,7 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  --font-heading: var(--font-serif);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -27,6 +27,9 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -48,73 +51,96 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/*
+ * CampusOS design system — warm cream surface, near-black ink, deep-green
+ * brand action color, amber accent. Card/list/dashboard patterns throughout
+ * the app read these through shadcn's semantic tokens (bg-primary,
+ * text-muted-foreground, border-border, …) so this file is the single
+ * place the whole app's look comes from. Per-tenant white-label overrides
+ * layer on top of this via lib/theme.ts — untouched by this palette.
+ */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --background: #EFEDE7;
+  --foreground: #10151A;
+  --card: #FFFFFF;
+  --card-foreground: #10151A;
+  --popover: #FFFFFF;
+  --popover-foreground: #10151A;
+  --primary: #10151A;
+  --primary-foreground: #F5F3EE;
+  --secondary: #F4F2ED;
+  --secondary-foreground: #6E6A61;
+  --muted: #FBFAF7;
+  --muted-foreground: #6E6A61;
+  --accent: #F1F6F3;
+  --accent-foreground: #15584A;
+  --destructive: #B3402F;
+  --destructive-foreground: #FDECE8;
+  --warning: #FDF3E0;
+  --warning-foreground: #8A5B10;
+  --border: #E3DFD6;
+  --input: #DDD8CD;
+  --ring: #15584A;
+  --chart-1: #15584A;
+  --chart-2: #C9821A;
+  --chart-3: #10151A;
+  --chart-4: #8A8478;
+  --chart-5: #B3402F;
+  --radius: 1rem;
+  --sidebar: #10151A;
+  --sidebar-foreground: #F5F3EE;
+  --sidebar-primary: #15584A;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: rgba(245, 243, 238, .09);
+  --sidebar-accent-foreground: #F5F3EE;
+  --sidebar-border: rgba(245, 243, 238, .12);
+  --sidebar-ring: #C9821A;
+
+  /* Brand hues available directly for one-off design-system accents. */
+  --brand-ink: #10151A;
+  --brand-cream: #F5F3EE;
+  --brand-green: #15584A;
+  --brand-amber: #C9821A;
+  --brand-rust: #B3402F;
+  --eyebrow: #8A8478;
+  --faint: #A39C8D;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --background: #10151A;
+  --foreground: #F5F3EE;
+  --card: #171C22;
+  --card-foreground: #F5F3EE;
+  --popover: #171C22;
+  --popover-foreground: #F5F3EE;
+  --primary: #C9821A;
+  --primary-foreground: #10151A;
+  --secondary: #232830;
+  --secondary-foreground: #F5F3EE;
+  --muted: #1B2027;
+  --muted-foreground: #A39C8D;
+  --accent: #1B2A25;
+  --accent-foreground: #8FBFAE;
+  --destructive: #E0685A;
+  --destructive-foreground: #2A1210;
+  --warning: #3A2E14;
+  --warning-foreground: #E8C275;
+  --border: rgba(245, 243, 238, .12);
+  --input: rgba(245, 243, 238, .16);
+  --ring: #C9821A;
+  --chart-1: #8FBFAE;
+  --chart-2: #C9821A;
+  --chart-3: #F5F3EE;
+  --chart-4: #A39C8D;
+  --chart-5: #E0685A;
+  --sidebar: #0B0E12;
+  --sidebar-foreground: #F5F3EE;
+  --sidebar-primary: #15584A;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: rgba(245, 243, 238, .07);
+  --sidebar-accent-foreground: #F5F3EE;
+  --sidebar-border: rgba(245, 243, 238, .1);
+  --sidebar-ring: #C9821A;
 }
 
 @layer base {
@@ -127,6 +153,15 @@
   html {
     @apply font-sans;
   }
+}
+
+/* Uppercase eyebrow micro-label — crumbs, section kickers, table headers. */
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--eyebrow);
 }
 
 @media print {

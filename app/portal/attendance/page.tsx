@@ -7,6 +7,7 @@ import { getPortalStudents, getActiveStudentId } from "@/lib/portal/context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/layout/empty-state";
+import { PageHeader } from "@/components/layout/page-header";
 import { ChildSwitcher } from "@/components/portal/child-switcher";
 
 export default async function PortalAttendancePage() {
@@ -38,13 +39,12 @@ export default async function PortalAttendancePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Attendance</h1>
-          <p className="text-muted-foreground text-sm">Overall: {overallPct != null ? `${overallPct}%` : "No records yet"}</p>
-        </div>
-        <ChildSwitcher students={students} activeStudentId={activeStudentId} />
-      </div>
+      <PageHeader
+        crumb="Student"
+        title="My attendance"
+        description={`Overall: ${overallPct != null ? `${overallPct}%` : "No records yet"}`}
+        actions={<ChildSwitcher students={students} activeStudentId={activeStudentId} />}
+      />
 
       {bySubject.size === 0 ? (
         <EmptyState icon={Users} title="No attendance recorded yet" />

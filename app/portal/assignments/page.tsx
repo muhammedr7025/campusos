@@ -8,13 +8,14 @@ import { getPortalStudents, getActiveStudentId } from "@/lib/portal/context";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/layout/empty-state";
+import { PageHeader } from "@/components/layout/page-header";
 import { ChildSwitcher } from "@/components/portal/child-switcher";
 import type { SubmissionStatus } from "@/generated/prisma/client";
 
-const STATUS_VARIANT: Record<SubmissionStatus, "default" | "secondary" | "outline" | "destructive"> = {
+const STATUS_VARIANT: Record<SubmissionStatus, "default" | "secondary" | "outline" | "destructive" | "warning"> = {
   MISSING: "destructive",
   SUBMITTED: "outline",
-  LATE: "secondary",
+  LATE: "warning",
   GRADED: "default",
 };
 
@@ -36,13 +37,12 @@ export default async function PortalAssignmentsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Assignments</h1>
-          <p className="text-muted-foreground text-sm">Due dates, submissions, and grades.</p>
-        </div>
-        <ChildSwitcher students={students} activeStudentId={activeStudentId} />
-      </div>
+      <PageHeader
+        crumb="Student"
+        title="Assignments"
+        description="Due dates, submissions, and grades."
+        actions={<ChildSwitcher students={students} activeStudentId={activeStudentId} />}
+      />
 
       {submissions.length === 0 ? (
         <EmptyState icon={FileText} title="No assignments yet" />

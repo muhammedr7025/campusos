@@ -8,6 +8,7 @@ import { Role } from "@/generated/prisma/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/layout/empty-state";
+import { PageHeader } from "@/components/layout/page-header";
 import { CourseFormDialog } from "@/components/admin/courses/course-form-dialog";
 import { SubjectsManager } from "@/components/admin/courses/subjects-manager";
 
@@ -34,19 +35,22 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
         <ArrowLeft className="size-4" /> Back to courses
       </Link>
 
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{course.name}</h1>
-          <p className="text-muted-foreground text-sm">
+      <PageHeader
+        crumb="Academics"
+        title={course.name}
+        description={
+          <>
             {course.batch.name} {course.durationLabel ? `· ${course.durationLabel}` : ""}
-          </p>
-          {course.description && <p className="text-muted-foreground mt-1 max-w-md text-sm">{course.description}</p>}
-        </div>
-        <CourseFormDialog
-          batches={batches}
-          course={{ id: course.id, batchId: course.batchId, name: course.name, description: course.description, durationLabel: course.durationLabel }}
-        />
-      </div>
+            {course.description && <span className="mt-1 block max-w-md">{course.description}</span>}
+          </>
+        }
+        actions={
+          <CourseFormDialog
+            batches={batches}
+            course={{ id: course.id, batchId: course.batchId, name: course.name, description: course.description, durationLabel: course.durationLabel }}
+          />
+        }
+      />
 
       <div>
         <h2 className="mb-3 text-lg font-semibold">Subjects</h2>

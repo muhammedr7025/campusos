@@ -409,3 +409,43 @@ export async function reassignStudentDivision(input: unknown): Promise<ActionRes
     return actionError(error);
   }
 }
+
+export type GuardianInviteResult = { email: string; password: string };
+
+export async function sendGuardianInvite(guardianId: string): Promise<ActionResult<GuardianInviteResult>> {
+  try {
+    const session = await requirePermission("student:manage");
+    const tenantId = await getTenantId();
+
+    const guardian = await prisma.parentGuardian.findFirst({
+      where: { id: guardianId, tenantId },
+      include: { user: true },
+    });
+    if (!guardian || !guardian.user) {
+      return { ok: false, error: "This guardian has no portal account." };
+    }
+
+    const password = generateTempPassword();
+    const passwordHash = await hashPassword(password);
+
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: guardian.user!.id },
+        data: { passwordHash, lastInviteSentAt: new Date() },
+      });
+      await writeAuditLog(tx, {
+        tenantId,
+        actorId: session.user.id,
+        action: "SEND_INVITE",
+        entityType: "ParentGuardian",
+        entityId: guardian.id,
+        diff: { email: guardian.user!.email },
+      });
+    });
+
+    revalidatePath("/admissions/invites");
+    return { ok: true, data: { email: guardian.user.email, password } };
+  } catch (error) {
+    return actionError(error);
+  }
+}

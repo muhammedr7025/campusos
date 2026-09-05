@@ -3,6 +3,7 @@ import { getTenantId } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
 import { Role } from "@/generated/prisma/client";
 import { UsersTable, type UserRow } from "@/components/admin/users/users-table";
+import { PageHeader } from "@/components/layout/page-header";
 
 export default async function UsersPage() {
   await requireRole(Role.SUPER_ADMIN);
@@ -17,10 +18,7 @@ export default async function UsersPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Users</h1>
-        <p className="text-muted-foreground text-sm">Staff accounts. Student/parent logins are created automatically at admission.</p>
-      </div>
+      <PageHeader crumb="Governance" title="Users & roles" description="Staff accounts. Student/parent logins are created automatically at admission." />
       <UsersTable users={rows} />
     </div>
   );

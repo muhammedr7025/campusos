@@ -8,10 +8,11 @@ export default async function LoginPage() {
   if (!tenant) redirect("/");
 
   return (
-    <Card className="w-full max-w-sm">
+    <Card className="w-full max-w-sm border-none bg-transparent shadow-none sm:border sm:bg-card sm:shadow-sm">
       <CardHeader>
-        <CardTitle>Sign in to {tenant.name}</CardTitle>
-        <CardDescription>Use the account provided by your institute.</CardDescription>
+        <div className="eyebrow">Sign in</div>
+        <CardTitle className="font-heading text-[28px] leading-tight font-normal">Choose your role</CardTitle>
+        <CardDescription>Sign in with the account provided by {tenant.name}.</CardDescription>
       </CardHeader>
       <CardContent>
         <LoginForm tenantName={tenant.subdomain} />

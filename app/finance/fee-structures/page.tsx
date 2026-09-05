@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/layout/empty-state";
 import { FeeStructureFormDialog } from "@/components/finance/fee-structure-form-dialog";
 import { DeleteFeeStructureButton } from "@/components/finance/delete-fee-structure-button";
+import { PageHeader } from "@/components/layout/page-header";
 
 export default async function FeeStructuresPage() {
   await requireRole(Role.SUPER_ADMIN, Role.FINANCE);
@@ -24,13 +25,12 @@ export default async function FeeStructuresPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Fee structures</h1>
-          <p className="text-muted-foreground text-sm">Per-course billing plans, applied automatically at admission.</p>
-        </div>
-        <FeeStructureFormDialog courses={courses.map((c) => ({ id: c.id, name: c.name }))} />
-      </div>
+      <PageHeader
+        crumb="Finance"
+        title="Fee structures"
+        description="Per-course billing plans, applied automatically at admission."
+        actions={<FeeStructureFormDialog courses={courses.map((c) => ({ id: c.id, name: c.name }))} />}
+      />
 
       {structures.length === 0 ? (
         <EmptyState

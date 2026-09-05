@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/layout/empty-state";
 import { AssignmentFormDialog } from "@/components/teacher/assignment-form-dialog";
+import { PageHeader } from "@/components/layout/page-header";
 
 export default async function TeacherAssignmentsPage() {
   const session = await requireRole(Role.SUPER_ADMIN, Role.TEACHER);
@@ -25,13 +26,12 @@ export default async function TeacherAssignmentsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Assignments</h1>
-          <p className="text-muted-foreground text-sm">Create, track, and grade submissions.</p>
-        </div>
-        <AssignmentFormDialog divisions={divisions} subjects={subjects} />
-      </div>
+      <PageHeader
+        crumb="Class"
+        title="Assignments"
+        description="Create, track, and grade submissions."
+        actions={<AssignmentFormDialog divisions={divisions} subjects={subjects} />}
+      />
 
       {assignments.length === 0 ? (
         <EmptyState icon={FileText} title="No assignments yet" description="Post your first assignment to a division." />

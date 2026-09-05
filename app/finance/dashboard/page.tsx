@@ -1,5 +1,6 @@
 import { Wallet, AlertCircle, Receipt } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader } from "@/components/layout/page-header";
+import { StatCard } from "@/components/layout/stat-card";
 import { requireRole } from "@/lib/rbac/guard";
 import { getTenantId } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
@@ -30,21 +31,10 @@ export default async function FinanceDashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Finance dashboard</h1>
-        <p className="text-muted-foreground text-sm">Collection status across all students.</p>
-      </div>
+      <PageHeader crumb="Finance" title="Collections overview" description="Collection status across all students." />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {cards.map((card) => (
-          <Card key={card.label}>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-muted-foreground text-sm font-medium">{card.label}</CardTitle>
-              <card.icon className="text-muted-foreground size-4" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{card.value}</div>
-            </CardContent>
-          </Card>
+          <StatCard key={card.label} label={card.label} value={card.value} icon={card.icon} />
         ))}
       </div>
     </div>

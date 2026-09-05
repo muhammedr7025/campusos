@@ -4,7 +4,7 @@ export type LeadRow = {
   phone: string;
   email: string | null;
   source: string;
-  status: "NEW" | "CONTACTED" | "INTERESTED" | "FOLLOW_UP" | "CONVERTED" | "LOST";
+  status: "NEW" | "CONTACTED" | "INTERESTED" | "FOLLOW_UP" | "READY" | "CONVERTED" | "LOST";
   lostReason: string | null;
   courseName: string | null;
   counselorName: string | null;

@@ -5,8 +5,9 @@ import { prisma } from "@/lib/prisma";
 import { Role } from "@/generated/prisma/client";
 import { getPortalStudents, getActiveStudentId } from "@/lib/portal/context";
 import { getCurrentFeePlanForStudent } from "@/lib/fees/balance";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/layout/empty-state";
+import { PageHeader } from "@/components/layout/page-header";
+import { StatCard } from "@/components/layout/stat-card";
 import { ChildSwitcher } from "@/components/portal/child-switcher";
 
 export default async function PortalDashboardPage() {
@@ -39,25 +40,16 @@ export default async function PortalDashboardPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{activeStudent.name}</h1>
-          <p className="text-muted-foreground text-sm">{activeStudent.courseName} · {activeStudent.divisionName ?? "No division"}</p>
-        </div>
-        <ChildSwitcher students={students} activeStudentId={activeStudentId} />
-      </div>
+      <PageHeader
+        crumb="Student"
+        title={activeStudent.name}
+        description={`${activeStudent.courseName} · ${activeStudent.divisionName ?? "No division"}`}
+        actions={<ChildSwitcher students={students} activeStudentId={activeStudentId} />}
+      />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {cards.map((card) => (
-          <Card key={card.label}>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-muted-foreground text-sm font-medium">{card.label}</CardTitle>
-              <card.icon className="text-muted-foreground size-4" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{card.value}</div>
-            </CardContent>
-          </Card>
+          <StatCard key={card.label} label={card.label} value={card.value} icon={card.icon} />
         ))}
       </div>
     </div>

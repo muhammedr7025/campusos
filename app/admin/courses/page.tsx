@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/layout/page-header";
 import { requireRole } from "@/lib/rbac/guard";
 import { getTenantId } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
@@ -28,10 +29,7 @@ export default async function CoursesPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Courses</h1>
-        <p className="text-muted-foreground text-sm">Programs offered under each batch.</p>
-      </div>
+      <PageHeader crumb="Academics" title="Courses" description="Programs offered under each batch." />
       <CoursesTable courses={rows} batches={batches.map((b) => ({ id: b.id, name: b.name }))} />
     </div>
   );

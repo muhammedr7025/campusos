@@ -7,6 +7,7 @@ import { Role } from "@/generated/prisma/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/layout/empty-state";
+import { PageHeader } from "@/components/layout/page-header";
 
 export default async function PaymentsLedgerPage() {
   await requireRole(Role.SUPER_ADMIN, Role.FINANCE);
@@ -21,10 +22,7 @@ export default async function PaymentsLedgerPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Payments</h1>
-        <p className="text-muted-foreground text-sm">Most recent 100 entries across all students — the accountability trail.</p>
-      </div>
+      <PageHeader crumb="Finance" title="Payment ledger" description="Most recent 100 entries across all students — the accountability trail." />
 
       {payments.length === 0 ? (
         <EmptyState icon={Receipt} title="No payments logged yet" description="Log a payment from a student's fee plan page." />

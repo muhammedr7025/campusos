@@ -5,6 +5,7 @@ import { Role } from "@/generated/prisma/client";
 import { getFeeSummaryForTenant } from "@/lib/fees/balance";
 import { DuesFilterBar } from "@/components/finance/dues-filter-bar";
 import { DuesTable } from "@/components/finance/dues-table";
+import { PageHeader } from "@/components/layout/page-header";
 
 export default async function DuesPage({
   searchParams,
@@ -29,10 +30,7 @@ export default async function DuesPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Dues</h1>
-        <p className="text-muted-foreground text-sm">Who&apos;s paid, who&apos;s pending, who&apos;s overdue.</p>
-      </div>
+      <PageHeader crumb="Finance" title="Dues" description="Who&apos;s paid, who&apos;s pending, who&apos;s overdue." />
       <DuesFilterBar courses={courses} />
       <DuesTable plans={filtered} />
     </div>

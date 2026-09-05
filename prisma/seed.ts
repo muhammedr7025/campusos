@@ -260,11 +260,14 @@ async function main() {
   await seedTenant({
     subdomain: "acme",
     name: "Acme Institute of Sciences",
-    primaryColor: "#2563eb",
-    secondaryColor: "#eff6ff",
-    accentColor: "#f59e0b",
+    primaryColor: "#15584A",
+    secondaryColor: "#F4F2ED",
+    accentColor: "#C9821A",
   });
 
+  // Nova keeps a deliberately different palette — the only way to prove
+  // white-labeling actually works is to see a second tenant that doesn't
+  // look like the first one.
   await seedTenant({
     subdomain: "nova",
     name: "Nova Learning Academy",

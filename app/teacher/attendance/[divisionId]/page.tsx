@@ -49,10 +49,17 @@ export default async function AttendanceRosterPage({
       <Link href="/teacher/attendance" className="text-muted-foreground flex items-center gap-1 text-sm hover:underline">
         <ArrowLeft className="size-4" /> Back
       </Link>
-      <div>
-        <h1 className="text-xl font-semibold">{division.course.name} · {division.name}</h1>
-        <p className="text-muted-foreground text-sm">{subjectRecord.name} · {new Date(`${date}T00:00:00`).toLocaleDateString()}</p>
+
+      <div className="rounded-2xl bg-[#10151A] p-5 text-[#F5F3EE]">
+        <div className="text-[11.5px] font-semibold tracking-[.12em] text-[#C9821A] uppercase">
+          Marking · {new Date(`${date}T00:00:00`).toLocaleDateString()}
+        </div>
+        <div className="font-heading mt-1 text-[25px] leading-tight">{subjectRecord.name}</div>
+        <div className="mt-1 text-[13px] text-[#F5F3EE]/60">
+          {division.course.name} · {division.name} · {students.length} student{students.length === 1 ? "" : "s"}
+        </div>
       </div>
+
       {students.length === 0 ? (
         <p className="text-muted-foreground text-sm">No active students in this division yet.</p>
       ) : (

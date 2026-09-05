@@ -2,6 +2,7 @@ import { requireRole } from "@/lib/rbac/guard";
 import { getCurrentTenant } from "@/lib/tenant";
 import { Role } from "@/generated/prisma/client";
 import { BrandingForm } from "@/components/admin/branding-form";
+import { PageHeader } from "@/components/layout/page-header";
 
 export default async function BrandingSettingsPage() {
   await requireRole(Role.SUPER_ADMIN);
@@ -10,10 +11,7 @@ export default async function BrandingSettingsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Branding</h1>
-        <p className="text-muted-foreground text-sm">White-label this workspace — no code changes needed, just save.</p>
-      </div>
+      <PageHeader crumb="Governance" title="Branding" description="White-label this workspace — no code changes needed, just save." />
       <BrandingForm
         initial={{
           name: tenant.name,

@@ -9,7 +9,7 @@ import { MarkLostDialog } from "@/components/crm/mark-lost-dialog";
 import type { LeadRow } from "@/components/crm/lead-row-types";
 import type { LeadStatus } from "@/generated/prisma/client";
 
-const COLUMNS: LeadStatus[] = ["NEW", "CONTACTED", "INTERESTED", "FOLLOW_UP", "CONVERTED", "LOST"];
+const COLUMNS: LeadStatus[] = ["NEW", "CONTACTED", "INTERESTED", "FOLLOW_UP", "READY", "CONVERTED", "LOST"];
 
 function LeadCard({ lead }: { lead: LeadRow }) {
   const editable = !["CONVERTED", "LOST"].includes(lead.status);

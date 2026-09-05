@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { changeLeadStage } from "@/lib/actions/leads";
 import { LEAD_STATUS_LABEL } from "@/components/crm/lead-status-badge";
 
-const EDITABLE_STAGES = ["NEW", "CONTACTED", "INTERESTED", "FOLLOW_UP"] as const;
+const EDITABLE_STAGES = ["NEW", "CONTACTED", "INTERESTED", "FOLLOW_UP", "READY"] as const;
 
 export function StageSelect({ leadId, status }: { leadId: string; status: string }) {
   const router = useRouter();

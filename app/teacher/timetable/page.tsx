@@ -6,6 +6,7 @@ import { Role } from "@/generated/prisma/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/layout/empty-state";
+import { PageHeader } from "@/components/layout/page-header";
 import { DAY_LABELS } from "@/lib/validators/timetable";
 
 export default async function TeacherTimetablePage() {
@@ -20,10 +21,7 @@ export default async function TeacherTimetablePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">My timetable</h1>
-        <p className="text-muted-foreground text-sm">Your weekly teaching schedule.</p>
-      </div>
+      <PageHeader crumb="Class" title="My timetable" description="Your weekly teaching schedule." />
 
       {entries.length === 0 ? (
         <EmptyState icon={CalendarDays} title="No classes scheduled yet" description="Once Admin schedules your classes, they'll show up here." />

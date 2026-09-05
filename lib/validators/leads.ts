@@ -19,7 +19,7 @@ export const followUpSchema = z.object({
 
 export const leadStageSchema = z.object({
   leadId: z.string().min(1),
-  status: z.enum(["NEW", "CONTACTED", "INTERESTED", "FOLLOW_UP"]),
+  status: z.enum(["NEW", "CONTACTED", "INTERESTED", "FOLLOW_UP", "READY"]),
 });
 
 export const lostLeadSchema = z.object({
@@ -27,6 +27,19 @@ export const lostLeadSchema = z.object({
   reason: z.string().min(2, "A reason helps track drop-off causes"),
 });
 
+export const bulkImportRowSchema = z.object({
+  name: z.string().min(1),
+  phone: z.string().min(1),
+  courseName: z.string().optional(),
+  source: z.enum(["WALK_IN", "PHONE", "WEB", "REFERRAL", "OTHER"]),
+});
+
+export const bulkImportSchema = z.object({
+  rows: z.array(bulkImportRowSchema).min(1),
+});
+
 export type LeadInput = z.infer<typeof leadSchema>;
 export type FollowUpInput = z.infer<typeof followUpSchema>;
 export type LostLeadInput = z.infer<typeof lostLeadSchema>;
+export type BulkImportRow = z.infer<typeof bulkImportRowSchema>;
+export type BulkImportInput = z.infer<typeof bulkImportSchema>;

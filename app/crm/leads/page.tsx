@@ -3,6 +3,7 @@ import { getTenantId } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
 import { Role } from "@/generated/prisma/client";
 import { LeadsView } from "@/components/crm/leads-view";
+import { PageHeader } from "@/components/layout/page-header";
 import type { LeadRow } from "@/components/crm/lead-row-types";
 import type { Prisma } from "@/generated/prisma/client";
 
@@ -57,10 +58,7 @@ export default async function LeadsPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Leads</h1>
-        <p className="text-muted-foreground text-sm">Follow every inquiry until it converts or is explicitly lost.</p>
-      </div>
+      <PageHeader crumb="CRM" title="Lead pipeline" description="Follow every inquiry until it converts or is explicitly lost." />
       <LeadsView leads={rows} courses={courses} counselors={counselors} />
     </div>
   );

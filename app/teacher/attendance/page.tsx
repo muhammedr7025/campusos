@@ -7,6 +7,7 @@ import { Role } from "@/generated/prisma/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/layout/empty-state";
+import { PageHeader } from "@/components/layout/page-header";
 import { DAY_LABELS } from "@/lib/validators/timetable";
 
 export default async function TeacherAttendancePage() {
@@ -24,10 +25,7 @@ export default async function TeacherAttendancePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Attendance</h1>
-        <p className="text-muted-foreground text-sm">Pick a class to mark attendance for.</p>
-      </div>
+      <PageHeader crumb="Class" title="Mark attendance" description="Pick a class to mark attendance for." />
 
       {entries.length === 0 ? (
         <EmptyState icon={ClipboardList} title="No classes assigned" description="Once Admin schedules your timetable, your classes will show up here." />

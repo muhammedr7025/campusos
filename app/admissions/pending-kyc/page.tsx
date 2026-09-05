@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/layout/empty-state";
+import { PageHeader } from "@/components/layout/page-header";
 
 export default async function PendingKycPage() {
   await requireRole(Role.SUPER_ADMIN, Role.ADMISSION_OFFICER);
@@ -31,10 +32,7 @@ export default async function PendingKycPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Admissions</h1>
-        <p className="text-muted-foreground text-sm">Convert ready leads and clear the KYC-pending queue.</p>
-      </div>
+      <PageHeader crumb="Admissions" title="Conversion queue" description="Convert ready leads and clear the KYC-pending queue." />
 
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold">Ready to convert</h2>

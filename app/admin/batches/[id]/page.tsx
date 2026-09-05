@@ -8,6 +8,7 @@ import { Role } from "@/generated/prisma/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/layout/empty-state";
+import { PageHeader } from "@/components/layout/page-header";
 import { BatchFormDialog } from "@/components/admin/batches/batch-form-dialog";
 
 export default async function BatchDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -29,13 +30,12 @@ export default async function BatchDetailPage({ params }: { params: Promise<{ id
         <ArrowLeft className="size-4" /> Back to batches
       </Link>
 
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{batch.name}</h1>
-          <p className="text-muted-foreground text-sm">{batch.startYear}–{batch.endYear} · <Badge variant="secondary">{batch.status}</Badge></p>
-        </div>
-        <BatchFormDialog batch={{ id: batch.id, name: batch.name, startYear: batch.startYear, endYear: batch.endYear }} />
-      </div>
+      <PageHeader
+        crumb="Academics"
+        title={batch.name}
+        description={<>{batch.startYear}–{batch.endYear} · <Badge variant="secondary">{batch.status}</Badge></>}
+        actions={<BatchFormDialog batch={{ id: batch.id, name: batch.name, startYear: batch.startYear, endYear: batch.endYear }} />}
+      />
 
       <div>
         <h2 className="mb-3 text-lg font-semibold">Courses</h2>

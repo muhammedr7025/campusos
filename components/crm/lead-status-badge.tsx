@@ -6,6 +6,7 @@ const LABEL: Record<LeadStatus, string> = {
   CONTACTED: "Contacted",
   INTERESTED: "Interested",
   FOLLOW_UP: "Follow-up",
+  READY: "Ready",
   CONVERTED: "Converted",
   LOST: "Lost",
 };
@@ -15,6 +16,7 @@ const VARIANT: Record<LeadStatus, "default" | "secondary" | "outline" | "destruc
   CONTACTED: "outline",
   INTERESTED: "default",
   FOLLOW_UP: "outline",
+  READY: "default",
   CONVERTED: "default",
   LOST: "destructive",
 };
