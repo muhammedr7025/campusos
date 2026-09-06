@@ -14,14 +14,23 @@ export default async function FeeStructuresPage() {
   await requireRole(Role.SUPER_ADMIN, Role.FINANCE);
   const tenantId = await getTenantId();
 
-  const [structures, courses] = await Promise.all([
+  const [structures, courses, students] = await Promise.all([
     prisma.feeStructure.findMany({
       where: { tenantId },
       include: { course: true, installments: { orderBy: { sequence: "asc" } }, _count: { select: { feePlans: true } } },
       orderBy: { createdAt: "desc" },
     }),
     prisma.course.findMany({ where: { tenantId }, orderBy: { name: "asc" } }),
+    prisma.student.findMany({ where: { tenantId }, select: { courseId: true } }),
   ]);
+
+  const studentCountByCourse = new Map<string, number>();
+  for (const s of students) studentCountByCourse.set(s.courseId, (studentCountByCourse.get(s.courseId) ?? 0) + 1);
+
+  const lateFeeLabel = (type: string | null, value: number | null) => {
+    if (!type || !value) return null;
+    return type === "PERCENT" ? `${value}% late fee` : `₹${value.toLocaleString("en-IN")} late fee`;
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -55,7 +64,16 @@ export default async function FeeStructuresPage() {
                     </Badge>
                   ))}
                 </div>
-                <p className="text-muted-foreground text-xs">{s._count.feePlans} student plan(s) linked</p>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                  <span className="text-muted-foreground">
+                    {s._count.feePlans} of {studentCountByCourse.get(s.courseId) ?? 0} in course
+                  </span>
+                  {lateFeeLabel(s.lateFeeType, s.lateFeeValue ? Number(s.lateFeeValue) : null) && (
+                    <span className="text-muted-foreground">
+                      {lateFeeLabel(s.lateFeeType, Number(s.lateFeeValue))} · {s.gracePeriodDays}-day grace
+                    </span>
+                  )}
+                </div>
                 <div className="mt-2 flex items-center gap-1">
                   <FeeStructureFormDialog
                     courses={courses.map((c) => ({ id: c.id, name: c.name }))}

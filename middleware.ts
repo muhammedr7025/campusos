@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth-edge";
 import { ROUTE_GROUP_ROLES, ROLE_HOME, type RouteGroup } from "@/lib/rbac/permissions";
+import { ROLE_VALUES, type RoleValue } from "@/lib/constants/roles";
 
 const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? "localhost:3000";
 const TENANT_COOKIE = "tenant";
@@ -14,6 +15,17 @@ const ROUTE_GROUP_PREFIXES: [prefix: string, group: RouteGroup][] = [
   ["/admissions", "admissions"],
   ["/teacher", "teacher"],
   ["/portal", "portal"],
+];
+
+/**
+ * A handful of pages live under one section's URL prefix but are legitimately
+ * linked to from another role's own nav too (e.g. Finance's "Audit log" entry
+ * points at /admin/audit). The target page's own requireRole call is what
+ * actually enforces access — this list only widens the edge-layer redirect
+ * gate above so following that link doesn't bounce the visitor back home.
+ */
+const EXTRA_ALLOWED_ROLES: [prefix: string, roles: RoleValue[]][] = [
+  ["/admin/audit", [ROLE_VALUES.FINANCE]],
 ];
 
 /**
@@ -68,7 +80,9 @@ export default auth((req) => {
         loginUrl.searchParams.set("callbackUrl", pathname);
         return NextResponse.redirect(loginUrl);
       }
-      if (!(ROUTE_GROUP_ROLES[group] as readonly typeof role[]).includes(role)) {
+      const extraAllowed = EXTRA_ALLOWED_ROLES.find(([prefix]) => pathname.startsWith(prefix))?.[1] ?? [];
+      const allowed = (ROUTE_GROUP_ROLES[group] as readonly RoleValue[]).includes(role) || extraAllowed.includes(role);
+      if (!allowed) {
         return NextResponse.redirect(new URL(ROLE_HOME[role], url));
       }
     }

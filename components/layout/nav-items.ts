@@ -80,13 +80,13 @@ export const ADMIN_NAV: NavGroup[] = [
 ];
 
 export const FINANCE_NAV: NavGroup[] = [
-  { label: "Overview", items: [{ href: "/finance/dashboard", label: "Dashboard", icon: LayoutDashboard }] },
+  { label: "Overview", items: [{ href: "/finance/dashboard", label: "Collections", icon: LayoutDashboard }] },
   {
     label: "Money",
     items: [
       { href: "/finance/fee-structures", label: "Fee structures", icon: Wallet },
+      { href: "/finance/dues", label: "Student dues", icon: AlertCircle },
       { href: "/finance/payments", label: "Payment ledger", icon: Receipt },
-      { href: "/finance/dues", label: "Dues", icon: AlertCircle },
     ],
   },
   {
@@ -94,10 +94,16 @@ export const FINANCE_NAV: NavGroup[] = [
     items: [
       { href: "/finance/reminders", label: "Reminder queue", icon: Megaphone },
       { href: "/finance/discounts", label: "Discounts & approvals", icon: ScrollText },
-      { href: "/finance/reports", label: "Collection report", icon: BarChart3 },
     ],
   },
-  { label: "Me", items: [MY_PROFILE] },
+  {
+    label: "Records",
+    items: [
+      { href: "/finance/reports", label: "Collection report", icon: BarChart3 },
+      { href: "/admin/audit", label: "Audit log", icon: History },
+      MY_PROFILE,
+    ],
+  },
 ];
 
 export const CRM_NAV: NavGroup[] = [
@@ -186,7 +192,14 @@ export const NAV_ITEMS_BY_GROUP = {
   portal: PORTAL_NAV,
 } as const;
 
-/** Which sidebar a role sees when it lands on a route with no fixed group (e.g. the shared /profile page). */
+/**
+ * Which sidebar a role always sees, regardless of which URL segment its
+ * current page happens to live under. Every role's own pages already permit
+ * cross-namespace links where the design calls for them (e.g. Finance's own
+ * nav links out to /admin/audit) — so the sidebar has to follow the signed-in
+ * role, not the current route, or the shell would swap to that route's
+ * section nav out from under the visitor.
+ */
 export const ROLE_DEFAULT_GROUP: Record<RoleValue, keyof typeof NAV_ITEMS_BY_GROUP> = {
   [ROLE_VALUES.SUPER_ADMIN]: "admin",
   [ROLE_VALUES.FINANCE]: "finance",
@@ -195,6 +208,15 @@ export const ROLE_DEFAULT_GROUP: Record<RoleValue, keyof typeof NAV_ITEMS_BY_GRO
   [ROLE_VALUES.TEACHER]: "teacher",
   [ROLE_VALUES.STUDENT]: "portal",
   [ROLE_VALUES.PARENT]: "portal",
+};
+
+export const GROUP_LABEL: Record<keyof typeof NAV_ITEMS_BY_GROUP, string> = {
+  admin: "Admin",
+  finance: "Finance",
+  crm: "CRM",
+  admissions: "Admissions",
+  teacher: "Teacher",
+  portal: "Student & Parent Portal",
 };
 
 export const ROLE_LABEL: Record<RoleValue, string> = {

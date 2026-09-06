@@ -18,7 +18,7 @@ const ACTION_VARIANT: Record<string, "default" | "secondary" | "destructive" | "
 };
 
 export default async function AuditLogPage() {
-  await requireRole(Role.SUPER_ADMIN);
+  await requireRole(Role.SUPER_ADMIN, Role.FINANCE);
   const tenantId = await getTenantId();
 
   const logs = await prisma.auditLog.findMany({

@@ -6,6 +6,7 @@ import { getTenantId } from "@/lib/tenant";
 import { requirePermission } from "@/lib/rbac/guard";
 import { writeAuditLog } from "@/lib/audit";
 import { notifier } from "@/lib/notifications";
+import { getFeeSummaryForTenant } from "@/lib/fees/balance";
 import {
   feeStructureSchema,
   paymentSchema,
@@ -323,6 +324,59 @@ export async function sendFeeReminder(studentId: string): Promise<ActionResult> 
 
     revalidatePath("/finance/reminders");
     return { ok: true, data: undefined };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function sendBulkOverdueReminders(): Promise<ActionResult<{ count: number }>> {
+  try {
+    const session = await requirePermission("payment:create");
+    const tenantId = await getTenantId();
+
+    const overduePlans = await getFeeSummaryForTenant(tenantId);
+    const overdueStudentIds = overduePlans.filter((p) => p.isOverdue).map((p) => p.studentId);
+    if (overdueStudentIds.length === 0) {
+      return { ok: true, data: { count: 0 } };
+    }
+
+    const students = await prisma.student.findMany({
+      where: { id: { in: overdueStudentIds }, tenantId },
+      include: { user: true, guardians: { include: { guardian: { include: { user: true } } } } },
+    });
+
+    await Promise.all(
+      students.map((student) => {
+        const recipients = [
+          student.user?.id,
+          ...student.guardians.map((sg) => sg.guardian.user?.id).filter((id): id is string => !!id),
+        ].filter((id): id is string => !!id);
+        return Promise.all(
+          recipients.map((recipientId) =>
+            notifier.send(tenantId, recipientId, "FEE_OVERDUE", {
+              title: "Fee reminder",
+              body: `A payment reminder was sent for ${student.name}'s outstanding fee balance.`,
+              relatedEntityType: "Student",
+              relatedEntityId: student.id,
+            }),
+          ),
+        );
+      }),
+    );
+
+    await prisma.auditLog.create({
+      data: {
+        tenantId,
+        actorId: session.user.id,
+        action: "CREATE",
+        entityType: "ReminderBatch",
+        entityId: `batch-${Date.now()}`,
+        diff: { count: students.length },
+      },
+    });
+
+    revalidatePath("/finance/reminders");
+    return { ok: true, data: { count: students.length } };
   } catch (error) {
     return actionError(error);
   }
