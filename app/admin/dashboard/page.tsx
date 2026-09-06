@@ -10,6 +10,8 @@ import { getTenantId } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
 import { Role } from "@/generated/prisma/client";
 import { getFeeSummaryForTenant } from "@/lib/fees/balance";
+import { countEnrolledStudents } from "@/lib/academics/enrollment";
+import { attendancePercent } from "@/lib/academics/attendance";
 
 const ACTION_VARIANT: Record<string, "default" | "secondary" | "destructive" | "warning"> = {
   DELETE: "destructive",
@@ -37,7 +39,7 @@ export default async function AdminDashboardPage() {
     plans,
     recentLogs,
   ] = await Promise.all([
-    prisma.student.count({ where: { tenantId, status: "ACTIVE" } }),
+    countEnrolledStudents(tenantId),
     prisma.division.findMany({ where: { tenantId }, select: { capacity: true } }),
     prisma.course.findMany({ where: { tenantId }, include: { batch: { select: { name: true } } }, orderBy: { name: "asc" } }),
     prisma.lead.findMany({ where: { tenantId }, select: { status: true } }),
@@ -68,8 +70,7 @@ export default async function AdminDashboardPage() {
   const readyLeads = leads.filter((l) => l.status === "READY").length;
   const overdueFollowUps = followUps.length;
 
-  const attPresent = attendance.filter((a) => a.status === "PRESENT" || a.status === "LATE").length;
-  const attPct = attendance.length > 0 ? Math.round((attPresent / attendance.length) * 100) : null;
+  const attPct = attendancePercent(attendance);
 
   const needsAttention = overdueFollowUps > 0 || readyLeads > 0 || outstanding > 0;
 

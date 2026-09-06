@@ -31,6 +31,7 @@ export type CourseRow = {
   durationLabel: string | null;
   divisionCount: number;
   studentCount: number;
+  defaultFee: number | null;
 };
 
 function DeleteCourseButton({ course }: { course: CourseRow }) {
@@ -84,6 +85,16 @@ export function CoursesTable({ courses, batches }: { courses: CourseRow[]; batch
       { accessorKey: "batchName", header: "Batch" },
       { accessorKey: "durationLabel", header: "Duration", cell: ({ row }) => row.original.durationLabel ?? "—" },
       {
+        id: "defaultFee",
+        header: "Default fee",
+        cell: ({ row }) =>
+          row.original.defaultFee == null ? (
+            <span className="text-muted-foreground">No plan</span>
+          ) : (
+            <span className="tabular-nums">₹{row.original.defaultFee.toLocaleString("en-IN")}</span>
+          ),
+      },
+      {
         id: "divisions",
         header: "Divisions",
         cell: ({ row }) => <Badge variant="secondary">{row.original.divisionCount}</Badge>,
@@ -121,6 +132,7 @@ export function CoursesTable({ courses, batches }: { courses: CourseRow[]; batch
               </Link>
               <p className="text-muted-foreground text-sm">
                 {course.batchName} · {course.divisionCount} divisions · {course.studentCount} students
+                {course.defaultFee != null && ` · ₹${course.defaultFee.toLocaleString("en-IN")}`}
               </p>
             </div>
             <DeleteCourseButton course={course} />

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { ENROLLED_STUDENT_WHERE } from "@/lib/academics/enrollment";
 import { getCurrentTenant, getTenantId } from "@/lib/tenant";
 import { requirePermission } from "@/lib/rbac/guard";
 import { writeAuditLog } from "@/lib/audit";
@@ -12,6 +13,8 @@ import {
   kycStatusSchema,
   studentProfileSchema,
   reassignDivisionSchema,
+  studentStatusSchema,
+  admitStudentSchema,
 } from "@/lib/validators/admissions";
 import { actionError, type ActionResult } from "@/lib/actions/types";
 import { Role, type KycDocType } from "@/generated/prisma/client";
@@ -39,7 +42,7 @@ export async function convertLead(input: unknown): Promise<ActionResult<ConvertL
 
     const division = await prisma.division.findFirstOrThrow({
       where: { id: data.divisionId, tenantId, courseId: data.courseId },
-      include: { _count: { select: { students: true } } },
+      include: { _count: { select: { students: { where: ENROLLED_STUDENT_WHERE } } } },
     });
     if (division.capacity != null && division._count.students >= division.capacity) {
       return { ok: false, error: `${division.name} is at capacity (${division.capacity}). Choose another division.` };
@@ -365,7 +368,7 @@ export async function reassignStudentDivision(input: unknown): Promise<ActionRes
 
     const targetDivision = await prisma.division.findFirstOrThrow({
       where: { id: data.divisionId, tenantId },
-      include: { _count: { select: { students: true } } },
+      include: { _count: { select: { students: { where: ENROLLED_STUDENT_WHERE } } } },
     });
     if (targetDivision.capacity != null && targetDivision._count.students >= targetDivision.capacity) {
       return { ok: false, error: `${targetDivision.name} is at capacity (${targetDivision.capacity}).` };
@@ -404,6 +407,246 @@ export async function reassignStudentDivision(input: unknown): Promise<ActionRes
 
     revalidatePath(`/admissions/students/${student.id}`);
     revalidatePath("/admin/divisions");
+    return { ok: true, data: undefined };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export type AdmitStudentResult = {
+  studentId: string;
+  enrollmentNumber: string;
+  studentLogin: { email: string; password: string };
+  guardianLogin: { email: string; password: string } | null;
+};
+
+/**
+ * Admits a walk-in directly, with no lead record in the picture. Everything
+ * downstream of a conversion still happens — portal logins, guardian linkage,
+ * fee plan, KYC checklist, enrollment row — so a directly admitted student is
+ * indistinguishable from a converted one afterwards.
+ */
+export async function admitStudent(input: unknown): Promise<ActionResult<AdmitStudentResult>> {
+  try {
+    const session = await requirePermission("student:manage");
+    const tenant = await getCurrentTenant();
+    if (!tenant) throw new Error("No tenant resolved.");
+    const tenantId = tenant.id;
+    const data = admitStudentSchema.parse(input);
+
+    const division = await prisma.division.findFirst({
+      where: { id: data.divisionId, tenantId, courseId: data.courseId },
+      include: { _count: { select: { students: { where: ENROLLED_STUDENT_WHERE } } } },
+    });
+    if (!division) {
+      return { ok: false, error: "That division doesn't belong to the selected course." };
+    }
+    if (division.capacity != null && division._count.students >= division.capacity) {
+      return { ok: false, error: `${division.name} is at capacity (${division.capacity}). Choose another division.` };
+    }
+
+    const feeStructure = await prisma.feeStructure.findFirst({
+      where: { tenantId, courseId: data.courseId },
+      include: { installments: { orderBy: { sequence: "asc" } } },
+    });
+
+    const year = new Date().getFullYear();
+    const studentCount = await prisma.student.count({ where: { tenantId } });
+    const enrollmentNumber = `${year}-${String(studentCount + 1).padStart(4, "0")}`;
+
+    const studentPassword = generateTempPassword();
+    const studentPasswordHash = await hashPassword(studentPassword);
+    const studentLoginEmail =
+      data.email && data.email.trim() !== "" ? data.email : `${enrollmentNumber}@student.${tenant.subdomain}`;
+
+    let guardianLogin: { email: string; password: string } | null = null;
+
+    const student = await prisma.$transaction(async (tx) => {
+      // Siblings share a parent — reuse an existing guardian by phone rather
+      // than duplicating them (PRD §8: Student <-> Parent is many-to-many).
+      let guardian = await tx.parentGuardian.findFirst({ where: { tenantId, phone: data.guardianPhone } });
+
+      if (!guardian) {
+        const guardianPassword = generateTempPassword();
+        const guardianPasswordHash = await hashPassword(guardianPassword);
+        const guardianLoginEmail =
+          data.guardianEmail && data.guardianEmail.trim() !== ""
+            ? data.guardianEmail
+            : `${enrollmentNumber}.parent@guardian.${tenant.subdomain}`;
+
+        const guardianUser = await tx.user.create({
+          data: {
+            tenantId,
+            email: guardianLoginEmail,
+            passwordHash: guardianPasswordHash,
+            name: data.guardianName,
+            phone: data.guardianPhone,
+            role: Role.PARENT,
+          },
+        });
+        guardian = await tx.parentGuardian.create({
+          data: {
+            tenantId,
+            name: data.guardianName,
+            phone: data.guardianPhone,
+            email: data.guardianEmail || null,
+            relationship: data.guardianRelationship || null,
+            userId: guardianUser.id,
+          },
+        });
+        guardianLogin = { email: guardianLoginEmail, password: guardianPassword };
+      }
+
+      const studentUser = await tx.user.create({
+        data: {
+          tenantId,
+          email: studentLoginEmail,
+          passwordHash: studentPasswordHash,
+          name: data.name,
+          phone: data.phone,
+          role: Role.STUDENT,
+        },
+      });
+
+      const created = await tx.student.create({
+        data: {
+          tenantId,
+          enrollmentNumber,
+          name: data.name,
+          phone: data.phone,
+          email: data.email || null,
+          dob: data.dob ? new Date(data.dob) : null,
+          address: data.address || null,
+          courseId: data.courseId,
+          divisionId: data.divisionId,
+          userId: studentUser.id,
+          status: "KYC_PENDING",
+        },
+      });
+
+      await tx.studentGuardian.create({
+        data: { studentId: created.id, guardianId: guardian.id, isPrimary: true },
+      });
+
+      await tx.enrollment.create({
+        data: { tenantId, studentId: created.id, divisionId: data.divisionId, recordedById: session.user.id },
+      });
+
+      await tx.kycDocument.createMany({
+        data: REQUIRED_KYC_DOCS.map((docType) => ({ tenantId, studentId: created.id, docType, required: true })),
+      });
+
+      if (feeStructure) {
+        await tx.feePlan.create({
+          data: {
+            tenantId,
+            studentId: created.id,
+            feeStructureId: feeStructure.id,
+            totalAmount: feeStructure.totalAmount,
+            installments: {
+              create: feeStructure.installments.map((i) => ({
+                label: i.label,
+                amount: i.amount,
+                dueDate: i.dueDate,
+                sequence: i.sequence,
+              })),
+            },
+          },
+        });
+      }
+
+      await writeAuditLog(tx, {
+        tenantId,
+        actorId: session.user.id,
+        action: "ADMIT",
+        entityType: "Student",
+        entityId: created.id,
+        diff: { enrollmentNumber, courseId: data.courseId, divisionId: data.divisionId, walkIn: true },
+      });
+
+      return created;
+    });
+
+    revalidatePath("/admissions/students");
+    revalidatePath("/admissions/pending-kyc");
+    revalidatePath("/admin/divisions");
+
+    return {
+      ok: true,
+      data: {
+        studentId: student.id,
+        enrollmentNumber,
+        studentLogin: { email: studentLoginEmail, password: studentPassword },
+        guardianLogin,
+      },
+    };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function setStudentStatus(studentId: string, status: unknown): Promise<ActionResult> {
+  try {
+    const session = await requirePermission("student:manage");
+    const tenantId = await getTenantId();
+    const next = studentStatusSchema.parse(status);
+
+    await prisma.$transaction(async (tx) => {
+      const student = await tx.student.findFirstOrThrow({ where: { id: studentId, tenantId } });
+      if (student.status === next) return;
+
+      await tx.student.update({ where: { id: student.id }, data: { status: next } });
+      await writeAuditLog(tx, {
+        tenantId,
+        actorId: session.user.id,
+        action: "UPDATE_STATUS",
+        entityType: "Student",
+        entityId: student.id,
+        diff: { name: student.name, from: student.status, to: next },
+      });
+    });
+
+    revalidatePath("/admissions/students");
+    revalidatePath(`/admissions/students/${studentId}`);
+    return { ok: true, data: undefined };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function deleteStudent(studentId: string): Promise<ActionResult> {
+  try {
+    const session = await requirePermission("student:delete");
+    const tenantId = await getTenantId();
+
+    const student = await prisma.student.findFirst({
+      where: { id: studentId, tenantId },
+      include: { _count: { select: { payments: true } } },
+    });
+    if (!student) return { ok: false, error: "Student not found." };
+
+    // Financial history is append-only and must stay auditable, so a student
+    // who has ever paid can only be deactivated (PRD §6.2).
+    if (student._count.payments > 0) {
+      return {
+        ok: false,
+        error: `${student.name} has ${student._count.payments} payment entr${student._count.payments === 1 ? "y" : "ies"}. Financial records can't be deleted — set the student to Inactive instead.`,
+      };
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.student.delete({ where: { id: student.id } });
+      await writeAuditLog(tx, {
+        tenantId,
+        actorId: session.user.id,
+        action: "DELETE",
+        entityType: "Student",
+        entityId: student.id,
+        diff: { name: student.name, enrollmentNumber: student.enrollmentNumber },
+      });
+    });
+
+    revalidatePath("/admissions/students");
     return { ok: true, data: undefined };
   } catch (error) {
     return actionError(error);

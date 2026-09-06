@@ -3,6 +3,7 @@ import { getTenantId } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
 import { Role } from "@/generated/prisma/client";
 import { PageHeader } from "@/components/layout/page-header";
+import { attendancePercent } from "@/lib/academics/attendance";
 import { MyStudentsTable, type MyStudentRow } from "@/components/teacher/my-students-table";
 
 export default async function MyStudentsPage() {
@@ -49,9 +50,7 @@ export default async function MyStudentsPage() {
   const postedAssignmentIds = new Set(assignments.map((a) => a.id));
 
   const rows: MyStudentRow[] = students.map((s) => {
-    const att = attendance.filter((a) => a.studentId === s.id);
-    const present = att.filter((a) => a.status === "PRESENT" || a.status === "LATE").length;
-    const attPct = att.length > 0 ? Math.round((present / att.length) * 100) : null;
+    const attPct = attendancePercent(attendance.filter((a) => a.studentId === s.id));
 
     const posted = s.divisionId ? (postedByDivision.get(s.divisionId) ?? 0) : 0;
     const submitted = submissions.filter((sub) => sub.studentId === s.id && postedAssignmentIds.has(sub.assignmentId)).length;

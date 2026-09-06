@@ -15,7 +15,7 @@ export default async function TeacherAttendancePage() {
   const tenantId = await getTenantId();
 
   const entries = await prisma.timetable.findMany({
-    where: { tenantId, teacherId: session.user.id },
+    where: { tenantId, ...(session.user.role === Role.SUPER_ADMIN ? {} : { teacherId: session.user.id }) },
     include: { division: { include: { course: true } }, subject: true },
     orderBy: [{ dayOfWeek: "asc" }, { startTime: "asc" }],
   });

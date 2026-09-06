@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { requireRole } from "@/lib/rbac/guard";
 import { getTenantId } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
+import { ENROLLED_STUDENT_WHERE } from "@/lib/academics/enrollment";
 import { Role } from "@/generated/prisma/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ConvertLeadForm } from "@/components/admissions/convert-lead-form";
@@ -18,7 +19,7 @@ export default async function ConvertLeadPage({ params }: { params: Promise<{ le
 
   const courses = await prisma.course.findMany({
     where: { tenantId },
-    include: { divisions: { include: { _count: { select: { students: true } } } } },
+    include: { divisions: { include: { _count: { select: { students: { where: ENROLLED_STUDENT_WHERE } } } } } },
     orderBy: { name: "asc" },
   });
 

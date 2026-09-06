@@ -49,6 +49,8 @@ export const PERMISSIONS = {
 
   "kyc:manage": [ROLE_VALUES.SUPER_ADMIN, ROLE_VALUES.ADMISSION_OFFICER],
   "student:manage": [ROLE_VALUES.SUPER_ADMIN, ROLE_VALUES.ADMISSION_OFFICER],
+  // Deleting a person record is admin-only; everyone else deactivates instead.
+  "student:delete": [ROLE_VALUES.SUPER_ADMIN],
 
   "fee-structure:manage": [ROLE_VALUES.SUPER_ADMIN, ROLE_VALUES.FINANCE],
   "fee-plan:override": [ROLE_VALUES.SUPER_ADMIN, ROLE_VALUES.FINANCE],

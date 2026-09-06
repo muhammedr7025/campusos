@@ -63,6 +63,40 @@ export async function createAnnouncement(input: unknown): Promise<ActionResult<{
   }
 }
 
+export async function updateAnnouncement(id: string, input: unknown): Promise<ActionResult> {
+  try {
+    const session = await requirePermission("announcement:manage");
+    const tenantId = await getTenantId();
+    const data = announcementSchema.parse(input);
+
+    await prisma.$transaction(async (tx) => {
+      const existing = await tx.announcement.findFirstOrThrow({ where: { id, tenantId } });
+      await tx.announcement.update({
+        where: { id: existing.id },
+        data: { title: data.title, body: data.body, audience: data.audience },
+      });
+      await writeAuditLog(tx, {
+        tenantId,
+        actorId: session.user.id,
+        action: "UPDATE",
+        entityType: "Announcement",
+        entityId: existing.id,
+        diff: {
+          from: { title: existing.title, audience: existing.audience },
+          to: { title: data.title, audience: data.audience },
+        },
+      });
+    });
+
+    // Deliberately no re-notification: an edit shouldn't re-ping every recipient.
+    revalidatePath("/admin/announcements");
+    revalidatePath("/portal/announcements");
+    return { ok: true, data: undefined };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
 export async function deleteAnnouncement(id: string): Promise<ActionResult> {
   try {
     const session = await requirePermission("announcement:manage");

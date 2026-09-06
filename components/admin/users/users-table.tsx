@@ -17,7 +17,27 @@ import { ROLE_LABEL } from "@/components/layout/nav-items";
 import type { Role } from "@/generated/prisma/client";
 import type { UpdateUserInput } from "@/lib/validators/users";
 
-export type UserRow = { id: string; name: string; email: string; phone: string | null; role: Role; isActive: boolean };
+export type UserRow = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  role: Role;
+  isActive: boolean;
+  lastLoginAt: string | null;
+};
+
+function LastActive({ iso }: { iso: string | null }) {
+  if (!iso) return <span className="text-muted-foreground">Never signed in</span>;
+  const date = new Date(iso);
+  const days = Math.floor((new Date().getTime() - date.getTime()) / 86400000);
+  const label = days === 0 ? "Today" : days === 1 ? "Yesterday" : `${days} days ago`;
+  return (
+    <span title={date.toLocaleString()} className="text-muted-foreground">
+      {label}
+    </span>
+  );
+}
 
 function ActiveToggle({ user }: { user: UserRow }) {
   const router = useRouter();
@@ -49,6 +69,13 @@ export function UsersTable({ users }: { users: UserRow[] }) {
       { accessorKey: "email", header: "Email" },
       { id: "role", header: "Role", cell: ({ row }) => <Badge variant="secondary">{ROLE_LABEL[row.original.role]}</Badge> },
       {
+        id: "status",
+        header: "Status",
+        cell: ({ row }) =>
+          row.original.isActive ? <Badge variant="default">Active</Badge> : <Badge variant="destructive">Suspended</Badge>,
+      },
+      { id: "lastActive", header: "Last active", cell: ({ row }) => <LastActive iso={row.original.lastLoginAt} /> },
+      {
         id: "actions",
         header: "",
         cell: ({ row }) => (
@@ -77,7 +104,13 @@ export function UsersTable({ users }: { users: UserRow[] }) {
             <div>
               <p className="font-medium">{user.name}</p>
               <p className="text-muted-foreground text-sm">{user.email}</p>
-              <Badge variant="secondary" className="mt-1">{ROLE_LABEL[user.role]}</Badge>
+              <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                <Badge variant="secondary">{ROLE_LABEL[user.role]}</Badge>
+                {user.isActive ? <Badge variant="default">Active</Badge> : <Badge variant="destructive">Suspended</Badge>}
+              </div>
+              <p className="text-muted-foreground mt-1 text-xs">
+                <LastActive iso={user.lastLoginAt} />
+              </p>
             </div>
             <RowActions user={user} />
           </CardContent>

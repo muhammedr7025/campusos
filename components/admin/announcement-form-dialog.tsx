@@ -5,7 +5,7 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, Loader2 } from "lucide-react";
+import { Plus, Loader2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,7 +21,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Field, FieldGroup, FieldLabel, FieldError } from "@/components/ui/field";
 import { announcementSchema, type AnnouncementInput } from "@/lib/validators/announcements";
-import { createAnnouncement } from "@/lib/actions/announcements";
+import { createAnnouncement, updateAnnouncement } from "@/lib/actions/announcements";
 
 const AUDIENCE_OPTIONS = [
   { value: "EVERYONE", label: "Everyone" },
@@ -30,7 +30,10 @@ const AUDIENCE_OPTIONS = [
   { value: "TEACHERS", label: "Teachers" },
 ] as const;
 
-export function AnnouncementFormDialog() {
+export type EditableAnnouncement = { id: string } & AnnouncementInput;
+
+export function AnnouncementFormDialog({ announcement }: { announcement?: EditableAnnouncement }) {
+  const isEdit = !!announcement;
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const {
@@ -41,17 +44,19 @@ export function AnnouncementFormDialog() {
     formState: { errors, isSubmitting },
   } = useForm<AnnouncementInput>({
     resolver: zodResolver(announcementSchema),
-    defaultValues: { title: "", body: "", audience: "EVERYONE" },
+    defaultValues: announcement
+      ? { title: announcement.title, body: announcement.body, audience: announcement.audience }
+      : { title: "", body: "", audience: "EVERYONE" },
   });
 
   async function onSubmit(values: AnnouncementInput) {
-    const result = await createAnnouncement(values);
+    const result = announcement ? await updateAnnouncement(announcement.id, values) : await createAnnouncement(values);
     if (!result.ok) {
       toast.error(result.error);
       return;
     }
-    toast.success("Announcement posted.");
-    reset();
+    toast.success(isEdit ? "Announcement updated." : "Announcement posted.");
+    if (!isEdit) reset();
     setOpen(false);
     router.refresh();
   }
@@ -59,14 +64,24 @@ export function AnnouncementFormDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>
-          <Plus /> New announcement
-        </Button>
+        {isEdit ? (
+          <Button variant="ghost" size="icon" aria-label="Edit announcement">
+            <Pencil className="size-4" />
+          </Button>
+        ) : (
+          <Button>
+            <Plus /> New announcement
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Create announcement</DialogTitle>
-          <DialogDescription>Delivered as an in-app notification to everyone in the audience.</DialogDescription>
+          <DialogTitle>{isEdit ? "Edit announcement" : "Create announcement"}</DialogTitle>
+          <DialogDescription>
+            {isEdit
+              ? "Corrections don't re-notify anyone who already received it."
+              : "Delivered as an in-app notification to everyone in the audience."}
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} noValidate>
           <FieldGroup>
@@ -99,7 +114,7 @@ export function AnnouncementFormDialog() {
           <DialogFooter className="mt-6">
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting && <Loader2 className="animate-spin" />}
-              Post announcement
+              {isEdit ? "Save changes" : "Post announcement"}
             </Button>
           </DialogFooter>
         </form>

@@ -2,31 +2,52 @@ import { History } from "lucide-react";
 import { requireRole } from "@/lib/rbac/guard";
 import { getTenantId } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
-import { Role } from "@/generated/prisma/client";
+import { Role, type Prisma } from "@/generated/prisma/client";
 import { PageHeader } from "@/components/layout/page-header";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/layout/empty-state";
+import { FilterPills } from "@/components/layout/filter-pills";
+import { AuditTable, type AuditRow } from "@/components/admin/audit-table";
 
-const ACTION_VARIANT: Record<string, "default" | "secondary" | "destructive" | "warning"> = {
-  DELETE: "destructive",
-  REJECT: "destructive",
-  UPDATE: "warning",
-  UPDATE_STATUS: "warning",
-  CORRECT: "warning",
-  REASSIGN_DIVISION: "warning",
+/** The entity families worth filtering by — money, people, academics, everything else. */
+const SCOPES: Record<string, string[]> = {
+  Finance: ["Payment", "FeePlan", "FeeStructure", "DiscountRequest", "Reminder", "ReminderBatch"],
+  People: ["Student", "User", "ParentGuardian", "KycDocument"],
+  Academics: ["Batch", "Course", "Division", "Subject", "Timetable", "Exam", "Mark", "SubjectNote", "Assignment"],
+  CRM: ["Lead", "FollowUp"],
 };
+const SCOPE_OPTIONS = ["All", ...Object.keys(SCOPES)];
 
-export default async function AuditLogPage() {
+export default async function AuditLogPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | undefined>>;
+}) {
   await requireRole(Role.SUPER_ADMIN, Role.FINANCE);
   const tenantId = await getTenantId();
+  const params = await searchParams;
+  const scope = SCOPE_OPTIONS.includes(params.scope ?? "") ? params.scope! : "All";
+
+  const where: Prisma.AuditLogWhereInput = {
+    tenantId,
+    ...(scope === "All" ? {} : { entityType: { in: SCOPES[scope] } }),
+  };
 
   const logs = await prisma.auditLog.findMany({
-    where: { tenantId },
+    where,
     include: { actor: { select: { name: true } } },
     orderBy: { createdAt: "desc" },
     take: 200,
   });
+
+  const rows: AuditRow[] = logs.map((log) => ({
+    id: log.id,
+    at: log.createdAt.toISOString(),
+    actor: log.actor?.name ?? "System",
+    action: log.action,
+    entityType: log.entityType,
+    entityId: log.entityId,
+    detail: log.diff == null ? "" : JSON.stringify(log.diff),
+  }));
 
   return (
     <div className="flex flex-col gap-6">
@@ -36,32 +57,12 @@ export default async function AuditLogPage() {
         description="Append-only. Every financially or academically consequential write lands here — most recent 200 entries."
       />
 
-      {logs.length === 0 ? (
-        <EmptyState icon={History} title="Nothing logged yet" />
+      <FilterPills options={SCOPE_OPTIONS} active={scope} paramKey="scope" />
+
+      {rows.length === 0 ? (
+        <EmptyState icon={History} title={scope === "All" ? "Nothing logged yet" : `No ${scope.toLowerCase()} activity yet`} />
       ) : (
-        <div className="flex flex-col gap-2">
-          {logs.map((log) => (
-            <Card key={log.id}>
-              <CardContent className="flex flex-wrap items-center gap-3 p-3.5 text-sm">
-                <span className="text-muted-foreground w-[150px] shrink-0 text-xs tabular-nums">
-                  {log.createdAt.toLocaleString()}
-                </span>
-                <span className="w-[130px] shrink-0 truncate font-medium">{log.actor?.name ?? "System"}</span>
-                <Badge variant={ACTION_VARIANT[log.action] ?? "default"} className="shrink-0">
-                  {log.action}
-                </Badge>
-                <span className="text-muted-foreground shrink-0">
-                  {log.entityType} · {log.entityId.slice(-8)}
-                </span>
-                {log.diff != null && (
-                  <span className="text-muted-foreground min-w-0 flex-1 truncate text-xs">
-                    {JSON.stringify(log.diff)}
-                  </span>
-                )}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <AuditTable rows={rows} />
       )}
     </div>
   );

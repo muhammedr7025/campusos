@@ -4,6 +4,7 @@ import { ArrowLeft, GraduationCap } from "lucide-react";
 import { requireRole } from "@/lib/rbac/guard";
 import { getTenantId } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
+import { ENROLLED_STUDENT_WHERE } from "@/lib/academics/enrollment";
 import { Role } from "@/generated/prisma/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -22,7 +23,7 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
     include: {
       batch: true,
       subjects: { orderBy: { name: "asc" } },
-      divisions: { include: { _count: { select: { students: true } } }, orderBy: { name: "asc" } },
+      divisions: { include: { _count: { select: { students: { where: ENROLLED_STUDENT_WHERE } } } }, orderBy: { name: "asc" } },
     },
   });
   if (!course) notFound();

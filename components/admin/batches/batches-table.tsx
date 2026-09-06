@@ -38,6 +38,7 @@ export type BatchRow = {
   endYear: number;
   status: BatchStatus;
   courseCount: number;
+  studentCount: number;
 };
 
 const STATUS_VARIANT: Record<BatchStatus, "default" | "secondary" | "outline"> = {
@@ -137,6 +138,7 @@ export function BatchesTable({ batches }: { batches: BatchRow[] }) {
         cell: ({ row }) => `${row.original.startYear}–${row.original.endYear}`,
       },
       { accessorKey: "courseCount", header: "Courses" },
+      { accessorKey: "studentCount", header: "Students" },
       {
         accessorKey: "status",
         header: "Status",
@@ -173,7 +175,8 @@ export function BatchesTable({ batches }: { batches: BatchRow[] }) {
                 {batch.name}
               </Link>
               <p className="text-muted-foreground text-sm">
-                {batch.startYear}–{batch.endYear} · {batch.courseCount} course{batch.courseCount === 1 ? "" : "s"}
+                {batch.startYear}–{batch.endYear} · {batch.courseCount} course{batch.courseCount === 1 ? "" : "s"} ·{" "}
+                {batch.studentCount} student{batch.studentCount === 1 ? "" : "s"}
               </p>
             </div>
             <div className="flex items-center gap-2">

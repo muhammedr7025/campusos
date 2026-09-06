@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:db:setup": "DATABASE_URL=\"postgresql://campusos@localhost:5432/campusos_test?schema=public\" prisma migrate deploy"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
@@ -47,6 +50,7 @@
     "prisma": "^7.10.0",
     "tailwindcss": "^4",
     "tsx": "^4.23.13",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.11"
   }
 }
