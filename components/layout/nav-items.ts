@@ -20,6 +20,7 @@ import {
   History,
   UserRound,
   Table2,
+  CalendarClock,
 } from "lucide-react";
 import type { NavItem } from "@/components/layout/app-shell";
 import { ROLE_VALUES, type RoleValue } from "@/lib/constants/roles";
@@ -110,7 +111,9 @@ export const CRM_NAV: NavGroup[] = [
   {
     label: "Pipeline",
     items: [
-      { href: "/crm/leads", label: "Leads", icon: Contact },
+      { href: "/crm/leads", label: "Pipeline board", icon: Contact },
+      { href: "/crm/leads?view=table", label: "All leads", icon: Table2 },
+      { href: "/crm/followups", label: "Follow-ups due", icon: CalendarClock },
       { href: "/crm/import", label: "Bulk import", icon: UserPlus },
     ],
   },
@@ -121,19 +124,33 @@ export const CRM_NAV: NavGroup[] = [
       { href: "/crm/lost", label: "Lost reasons", icon: History },
     ],
   },
-  { label: "Me", items: [MY_PROFILE] },
+  {
+    label: "Me",
+    items: [{ href: "/crm/activity", label: "My activity", icon: History }, MY_PROFILE],
+  },
 ];
 
 export const ADMISSIONS_NAV: NavGroup[] = [
   {
     label: "Admissions",
     items: [
-      { href: "/admissions/pending-kyc", label: "Pending KYC", icon: ClipboardCheck },
-      { href: "/admissions/students", label: "Students", icon: UserPlus },
-      { href: "/admissions/invites", label: "Parent invites", icon: Megaphone },
+      { href: "/admissions/queue", label: "Conversion queue", icon: UserPlus },
+      { href: "/admissions/kyc", label: "KYC tracker", icon: ClipboardCheck },
+      { href: "/admissions/students", label: "Admitted students", icon: GraduationCap },
+      { href: "/admissions/capacity", label: "Division capacity", icon: Layers },
     ],
   },
-  { label: "Me", items: [MY_PROFILE] },
+  {
+    label: "Comms",
+    items: [
+      { href: "/admissions/invites", label: "Parent invites", icon: Megaphone },
+      { href: "/admissions/notices", label: "Notices", icon: FileText },
+    ],
+  },
+  {
+    label: "Records",
+    items: [{ href: "/admin/audit", label: "Audit log", icon: History }, MY_PROFILE],
+  },
 ];
 
 export const TEACHER_NAV: NavGroup[] = [

@@ -31,7 +31,7 @@ export default async function ConvertLeadPage({ params }: { params: Promise<{ le
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
-      <Link href="/admissions/pending-kyc" className="text-muted-foreground flex items-center gap-1 text-sm hover:underline">
+      <Link href="/admissions/queue" className="text-muted-foreground flex items-center gap-1 text-sm hover:underline">
         <ArrowLeft className="size-4" /> Back
       </Link>
       <Card>

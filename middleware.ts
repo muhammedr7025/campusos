@@ -25,7 +25,7 @@ const ROUTE_GROUP_PREFIXES: [prefix: string, group: RouteGroup][] = [
  * gate above so following that link doesn't bounce the visitor back home.
  */
 const EXTRA_ALLOWED_ROLES: [prefix: string, roles: RoleValue[]][] = [
-  ["/admin/audit", [ROLE_VALUES.FINANCE]],
+  ["/admin/audit", [ROLE_VALUES.FINANCE, ROLE_VALUES.ADMISSION_OFFICER]],
 ];
 
 /**

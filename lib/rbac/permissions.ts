@@ -26,7 +26,7 @@ export const ROLE_HOME: Record<Role, string> = {
   [ROLE_VALUES.SUPER_ADMIN]: "/admin/dashboard",
   [ROLE_VALUES.FINANCE]: "/finance/dashboard",
   [ROLE_VALUES.COUNSELOR]: "/crm/leads",
-  [ROLE_VALUES.ADMISSION_OFFICER]: "/admissions/pending-kyc",
+  [ROLE_VALUES.ADMISSION_OFFICER]: "/admissions/queue",
   [ROLE_VALUES.TEACHER]: "/teacher/timetable",
   [ROLE_VALUES.STUDENT]: "/portal/dashboard",
   [ROLE_VALUES.PARENT]: "/portal/dashboard",

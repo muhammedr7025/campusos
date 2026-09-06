@@ -213,7 +213,8 @@ export async function convertLead(input: unknown): Promise<ActionResult<ConvertL
     });
 
     revalidatePath("/crm/leads");
-    revalidatePath("/admissions/pending-kyc");
+    revalidatePath("/admissions/queue");
+    revalidatePath("/admissions/kyc");
     revalidatePath("/admissions/students");
 
     return {
@@ -304,7 +305,8 @@ export async function setKycStatus(input: unknown): Promise<ActionResult> {
     });
 
     revalidatePath(`/admissions/students/${doc.studentId}`);
-    revalidatePath("/admissions/pending-kyc");
+    revalidatePath("/admissions/queue");
+    revalidatePath("/admissions/kyc");
     return { ok: true, data: undefined };
   } catch (error) {
     return actionError(error);
@@ -568,7 +570,8 @@ export async function admitStudent(input: unknown): Promise<ActionResult<AdmitSt
     });
 
     revalidatePath("/admissions/students");
-    revalidatePath("/admissions/pending-kyc");
+    revalidatePath("/admissions/queue");
+    revalidatePath("/admissions/kyc");
     revalidatePath("/admin/divisions");
 
     return {

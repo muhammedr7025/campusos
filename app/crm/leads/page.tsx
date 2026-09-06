@@ -6,6 +6,9 @@ import { LeadsView } from "@/components/crm/leads-view";
 import { PageHeader } from "@/components/layout/page-header";
 import type { LeadRow } from "@/components/crm/lead-row-types";
 import type { Prisma } from "@/generated/prisma/client";
+import { FilterPills } from "@/components/layout/filter-pills";
+
+const STAGES = ["NEW", "CONTACTED", "INTERESTED", "FOLLOW_UP", "READY", "CONVERTED", "LOST"];
 
 export default async function LeadsPage({
   searchParams,
@@ -15,8 +18,11 @@ export default async function LeadsPage({
   await requireRole(Role.SUPER_ADMIN, Role.COUNSELOR);
   const tenantId = await getTenantId();
   const params = await searchParams;
+  const isTable = params.view === "table";
 
   const where: Prisma.LeadWhereInput = { tenantId };
+  // Stage pills apply to the table view; the kanban shows every column at once.
+  if (params.stage && STAGES.includes(params.stage)) where.status = params.stage as never;
   if (params.counselor) where.assignedCounselorId = params.counselor;
   if (params.source) where.source = params.source as Prisma.LeadWhereInput["source"];
   if (params.course) where.interestedCourseId = params.course;
@@ -59,6 +65,7 @@ export default async function LeadsPage({
   return (
     <div className="flex flex-col gap-6">
       <PageHeader crumb="CRM" title="Lead pipeline" description="Follow every inquiry until it converts or is explicitly lost." />
+      {isTable && <FilterPills options={["All", ...STAGES]} active={params.stage ?? "All"} paramKey="stage" />}
       <LeadsView
         leads={rows}
         courses={courses}

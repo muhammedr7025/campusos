@@ -22,7 +22,7 @@ export default async function AuditLogPage({
 }: {
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
-  await requireRole(Role.SUPER_ADMIN, Role.FINANCE);
+  await requireRole(Role.SUPER_ADMIN, Role.FINANCE, Role.ADMISSION_OFFICER);
   const tenantId = await getTenantId();
   const params = await searchParams;
   const scope = SCOPE_OPTIONS.includes(params.scope ?? "") ? params.scope! : "All";
