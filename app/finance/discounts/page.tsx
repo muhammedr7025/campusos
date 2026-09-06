@@ -3,6 +3,7 @@ import { requireRole, requireSession } from "@/lib/rbac/guard";
 import { getTenantId } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/layout/page-header";
+import { FilterPills } from "@/components/layout/filter-pills";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/layout/empty-state";
@@ -12,15 +13,27 @@ import { ScrollText } from "lucide-react";
 
 const STATUS_VARIANT = { PENDING: "warning", APPROVED: "default", REJECTED: "destructive" } as const;
 
-export default async function DiscountsPage() {
+const STATUSES = ["All", "PENDING", "APPROVED", "REJECTED"] as const;
+
+export default async function DiscountsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | undefined>>;
+}) {
   const session = await requireRole(Role.SUPER_ADMIN, Role.FINANCE);
   await requireSession();
   const tenantId = await getTenantId();
+  const params = await searchParams;
+  const status = (STATUSES as readonly string[]).includes(params.status ?? "") ? params.status! : "All";
 
   const [requests, students] = await Promise.all([
     prisma.discountRequest.findMany({
-      where: { tenantId },
-      include: { student: { select: { name: true, enrollmentNumber: true } }, requestedBy: { select: { name: true } } },
+      where: { tenantId, ...(status === "All" ? {} : { status: status as never }) },
+      include: {
+        student: { select: { name: true, enrollmentNumber: true } },
+        requestedBy: { select: { name: true } },
+        decidedBy: { select: { name: true } },
+      },
       orderBy: { createdAt: "desc" },
     }),
     prisma.student.findMany({ where: { tenantId }, select: { id: true, name: true, enrollmentNumber: true }, orderBy: { name: "asc" } }),
@@ -37,8 +50,13 @@ export default async function DiscountsPage() {
         actions={<DiscountRequestDialog students={students} />}
       />
 
+      <FilterPills options={[...STATUSES]} active={status} paramKey="status" />
+
       {requests.length === 0 ? (
-        <EmptyState icon={ScrollText} title="No discount requests yet" />
+        <EmptyState
+          icon={ScrollText}
+          title={status === "All" ? "No discount requests yet" : `Nothing ${status.toLowerCase()}`}
+        />
       ) : (
         <div className="flex flex-col gap-2">
           {requests.map((r) => (
@@ -51,7 +69,12 @@ export default async function DiscountsPage() {
                   <p className="text-muted-foreground text-sm">
                     {r.kind} · ₹{Number(r.amount).toLocaleString("en-IN")} · {r.reason}
                   </p>
-                  <p className="text-muted-foreground text-xs">Requested by {r.requestedBy.name}</p>
+                  <p className="text-muted-foreground text-xs">
+                    Requested by {r.requestedBy.name}
+                    {r.decidedBy && r.decidedAt
+                      ? ` · ${r.status === "APPROVED" ? "approved" : "rejected"} by ${r.decidedBy.name} on ${r.decidedAt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}`
+                      : ""}
+                  </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge variant={STATUS_VARIANT[r.status]}>{r.status}</Badge>

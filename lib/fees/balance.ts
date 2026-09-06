@@ -35,26 +35,56 @@ export type FeePlanSummary = {
   nextDueDate: Date | null;
 };
 
+/**
+ * One row per student, never per fee plan.
+ *
+ * An approved discount (and any manual override) supersedes a student's plan
+ * by writing a *new* one rather than editing the old — so a student can hold
+ * several. Only the newest is what they owe; billing every plan they've ever
+ * had would double-count them in every institute-wide total.
+ *
+ * Payments belong to the student, not to the plan that happened to be current
+ * when they paid, so `paid` sums all of them. Otherwise approving a discount
+ * would silently zero out money already collected.
+ */
 export async function getFeeSummaryForTenant(tenantId: string, filters?: { courseId?: string; divisionId?: string }): Promise<FeePlanSummary[]> {
-  const plans = await prisma.feePlan.findMany({
-    where: {
-      tenantId,
-      student: {
-        ...(filters?.courseId ? { courseId: filters.courseId } : {}),
-        ...(filters?.divisionId ? { divisionId: filters.divisionId } : {}),
+  const studentWhere = {
+    ...(filters?.courseId ? { courseId: filters.courseId } : {}),
+    ...(filters?.divisionId ? { divisionId: filters.divisionId } : {}),
+  };
+
+  const [plans, payments] = await Promise.all([
+    prisma.feePlan.findMany({
+      where: { tenantId, student: studentWhere },
+      include: {
+        installments: true,
+        student: { select: { id: true, name: true, enrollmentNumber: true } },
       },
-    },
-    include: {
-      installments: true,
-      payments: true,
-      student: { select: { id: true, name: true, enrollmentNumber: true } },
-    },
-  });
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.payment.findMany({
+      where: { tenantId, student: studentWhere },
+      select: { studentId: true, amount: true },
+    }),
+  ]);
+
+  const paidByStudent = new Map<string, number>();
+  for (const p of payments) {
+    paidByStudent.set(p.studentId, (paidByStudent.get(p.studentId) ?? 0) + Number(p.amount));
+  }
+
+  // Plans come back newest-first, so the first one seen per student is current.
+  const currentPlans = new Map<string, (typeof plans)[number]>();
+  for (const plan of plans) {
+    if (!currentPlans.has(plan.studentId)) currentPlans.set(plan.studentId, plan);
+  }
 
   const today = new Date();
 
-  return plans.map((plan) => {
-    const { total, paid, balance } = computeBalance(plan, plan.payments);
+  return [...currentPlans.values()].map((plan) => {
+    const total = Number(plan.totalAmount);
+    const paid = paidByStudent.get(plan.studentId) ?? 0;
+    const balance = Math.max(total - paid, 0);
     const due = amountDueByDate(plan.installments, today);
     const isOverdue = balance > 0 && paid < due;
     const nextDue = plan.installments
@@ -81,13 +111,20 @@ export async function getCurrentFeePlanForStudent(tenantId: string, studentId: s
     orderBy: { createdAt: "desc" },
     include: {
       installments: { orderBy: { sequence: "asc" } },
-      payments: { orderBy: { paidAt: "desc" }, include: { collectedBy: { select: { name: true } } } },
       student: true,
       approvedBy: { select: { name: true } },
     },
   });
   if (!plan) return null;
 
-  const { total, paid, balance } = computeBalance(plan, plan.payments);
-  return { plan, total, paid, balance };
+  // Every payment the student has made, including any logged against a plan
+  // this one superseded — see getFeeSummaryForTenant.
+  const payments = await prisma.payment.findMany({
+    where: { tenantId, studentId },
+    orderBy: { paidAt: "desc" },
+    include: { collectedBy: { select: { name: true } }, corrections: { select: { id: true } } },
+  });
+
+  const { total, paid, balance } = computeBalance(plan, payments);
+  return { plan: { ...plan, payments }, total, paid, balance };
 }

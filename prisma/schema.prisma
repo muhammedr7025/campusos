@@ -516,8 +516,13 @@ model Payment {
   correctionOfId  String?
   correctionOf    Payment?             @relation("PaymentCorrection", fields: [correctionOfId], references: [id])
   corrections     Payment[]            @relation("PaymentCorrection")
+  // Human-readable, per-tenant sequential receipt (RCP-0001); a correction
+  // carries the original's number with an -R suffix so the pair reads as one
+  // event on the ledger. Nullable only so pre-existing rows can be backfilled.
+  receiptNumber   String?
   createdAt       DateTime             @default(now())
 
+  @@unique([tenantId, receiptNumber])
   @@index([tenantId, studentId])
   @@index([tenantId, feePlanId])
   @@map("payments")

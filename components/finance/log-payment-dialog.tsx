@@ -25,35 +25,74 @@ import { logPayment } from "@/lib/actions/finance";
 
 const MODE_OPTIONS = ["CASH", "UPI", "BANK_TRANSFER", "CHEQUE", "OTHER"] as const;
 
+export type PayableStudent = {
+  id: string;
+  name: string;
+  enrollmentNumber: string;
+  feePlanId: string;
+  balance: number;
+  installments: { id: string; label: string; amount: number }[];
+};
+
+/**
+ * Used two ways: pinned to one student on their fee page, or with a picker on
+ * the ledger, where finance logs a payment without navigating to the student
+ * first. Same form either way so the validation and wording can't drift.
+ */
 export function LogPaymentDialog({
   studentId,
   feePlanId,
   installments,
+  students,
 }: {
-  studentId: string;
-  feePlanId: string;
-  installments: { id: string; label: string; amount: number }[];
+  studentId?: string;
+  feePlanId?: string;
+  installments?: { id: string; label: string; amount: number }[];
+  students?: PayableStudent[];
 }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
+
+  const pickable = students ?? [];
+  const isPicker = pickable.length > 0;
+  const first = pickable[0];
+  const initialStudentId = studentId ?? first?.id ?? "";
+  const initialPlanId = feePlanId ?? first?.feePlanId ?? "";
+  const fixedInstallments = installments ?? first?.installments ?? [];
+
   const {
     register,
     handleSubmit,
     control,
     reset,
+    watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<PaymentInput>({
     resolver: zodResolver(paymentSchema),
     defaultValues: {
-      studentId,
-      feePlanId,
-      installmentId: installments[0]?.id,
-      amount: installments[0]?.amount ?? 0,
+      studentId: initialStudentId,
+      feePlanId: initialPlanId,
+      installmentId: fixedInstallments[0]?.id,
+      amount: fixedInstallments[0]?.amount ?? 0,
       mode: "CASH",
       paidAt: new Date().toISOString().slice(0, 10),
       note: "",
     },
   });
+
+  const selectedStudentId = watch("studentId");
+  const selected = isPicker ? pickable.find((s) => s.id === selectedStudentId) : undefined;
+  const activeInstallments = isPicker ? (selected?.installments ?? []) : fixedInstallments;
+
+  function onStudentChange(nextId: string) {
+    const student = pickable.find((s) => s.id === nextId);
+    if (!student) return;
+    setValue("studentId", nextId);
+    setValue("feePlanId", student.feePlanId);
+    setValue("installmentId", student.installments[0]?.id);
+    setValue("amount", Math.min(student.installments[0]?.amount ?? student.balance, student.balance));
+  }
 
   async function onSubmit(values: PaymentInput) {
     const result = await logPayment(values);
@@ -81,7 +120,25 @@ export function LogPaymentDialog({
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} noValidate>
           <FieldGroup>
-            {installments.length > 0 && (
+            {isPicker && (
+              <Field data-invalid={!!errors.studentId}>
+                <FieldLabel htmlFor="studentId">Student</FieldLabel>
+                <Select value={selectedStudentId} onValueChange={onStudentChange}>
+                  <SelectTrigger id="studentId" className="w-full">
+                    <SelectValue placeholder="Select a student" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {pickable.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.name} · ₹{s.balance.toLocaleString("en-IN")} due
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FieldError errors={errors.studentId ? [errors.studentId] : undefined} />
+              </Field>
+            )}
+            {activeInstallments.length > 0 && (
               <Field>
                 <FieldLabel htmlFor="installmentId">Installment</FieldLabel>
                 <Controller
@@ -93,7 +150,7 @@ export function LogPaymentDialog({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {installments.map((i) => (
+                        {activeInstallments.map((i) => (
                           <SelectItem key={i.id} value={i.id}>
                             {i.label} — ₹{i.amount.toLocaleString("en-IN")}
                           </SelectItem>

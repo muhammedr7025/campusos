@@ -17,7 +17,14 @@ export function DuesFilterBar({ courses }: { courses: { id: string; name: string
     router.push(`${pathname}?${params.toString()}`);
   }
 
-  const hasFilters = ["course", "status"].some((k) => searchParams.get(k));
+  // Status lives in the pill row above; this bar only owns the course filter.
+  const hasFilters = searchParams.get("course") != null;
+
+  function clearCourse() {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("course");
+    router.push(params.toString() ? `${pathname}?${params.toString()}` : pathname);
+  }
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -31,19 +38,9 @@ export function DuesFilterBar({ courses }: { courses: { id: string; name: string
         </SelectContent>
       </Select>
 
-      <Select value={searchParams.get("status") ?? "all"} onValueChange={(v) => setParam("status", v)}>
-        <SelectTrigger className="w-[150px]"><SelectValue placeholder="Status" /></SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All statuses</SelectItem>
-          <SelectItem value="overdue">Overdue</SelectItem>
-          <SelectItem value="pending">Pending</SelectItem>
-          <SelectItem value="paid">Fully paid</SelectItem>
-        </SelectContent>
-      </Select>
-
       {hasFilters && (
-        <Button variant="ghost" size="sm" onClick={() => router.push(pathname)}>
-          <X /> Clear
+        <Button variant="ghost" size="sm" onClick={clearCourse}>
+          <X /> Clear course
         </Button>
       )}
     </div>

@@ -14,6 +14,7 @@ import {
   feePlanOverrideSchema,
 } from "@/lib/validators/finance";
 import { actionError, type ActionResult } from "@/lib/actions/types";
+import type { Prisma } from "@/generated/prisma/client";
 
 export async function createFeeStructure(input: unknown): Promise<ActionResult<{ id: string }>> {
   try {
@@ -61,6 +62,22 @@ export async function createFeeStructure(input: unknown): Promise<ActionResult<{
   }
 }
 
+/**
+ * Next receipt number for a tenant, e.g. RCP-0007. Derived from the highest
+ * existing number rather than a row count, so deleting nothing and reversing
+ * anything can't hand out a number twice. The unique index on
+ * (tenantId, receiptNumber) is the real backstop.
+ */
+async function nextReceiptNumber(tx: Prisma.TransactionClient, tenantId: string): Promise<string> {
+  const latest = await tx.payment.findFirst({
+    where: { tenantId, correctionOfId: null, receiptNumber: { startsWith: "RCP-" } },
+    orderBy: { receiptNumber: "desc" },
+    select: { receiptNumber: true },
+  });
+  const previous = latest?.receiptNumber ? Number.parseInt(latest.receiptNumber.slice(4), 10) : 0;
+  return `RCP-${String((Number.isNaN(previous) ? 0 : previous) + 1).padStart(4, "0")}`;
+}
+
 export async function logPayment(input: unknown): Promise<ActionResult> {
   try {
     const session = await requirePermission("payment:create");
@@ -68,7 +85,32 @@ export async function logPayment(input: unknown): Promise<ActionResult> {
     const data = paymentSchema.parse(input);
 
     await prisma.$transaction(async (tx) => {
-      await tx.feePlan.findFirstOrThrow({ where: { id: data.feePlanId, tenantId, studentId: data.studentId } });
+      const plan = await tx.feePlan.findFirstOrThrow({
+        where: { id: data.feePlanId, tenantId, studentId: data.studentId },
+        include: { installments: { select: { id: true } } },
+      });
+
+      if (data.installmentId && !plan.installments.some((i) => i.id === data.installmentId)) {
+        throw new Error("That installment doesn't belong to this student's fee plan.");
+      }
+
+      // Balance is derived, never stored — so the guard recomputes it here
+      // rather than trusting anything the client sent. Payments are summed per
+      // student, not per plan: an approved discount supersedes the plan, and
+      // money paid under the old one still counts (see getFeeSummaryForTenant).
+      const priorPayments = await tx.payment.findMany({
+        where: { tenantId, studentId: data.studentId },
+        select: { amount: true },
+      });
+      const paid = priorPayments.reduce((sum, p) => sum + Number(p.amount), 0);
+      const outstanding = Number(plan.totalAmount) - paid;
+      if (data.amount > outstanding) {
+        throw new Error(
+          outstanding <= 0
+            ? "This fee plan is already settled in full."
+            : `That's more than the ₹${outstanding.toLocaleString("en-IN")} outstanding on this plan.`,
+        );
+      }
 
       const payment = await tx.payment.create({
         data: {
@@ -81,6 +123,7 @@ export async function logPayment(input: unknown): Promise<ActionResult> {
           paidAt: new Date(data.paidAt),
           collectedById: session.user.id,
           note: data.note || null,
+          receiptNumber: await nextReceiptNumber(tx, tenantId),
         },
       });
 
@@ -116,7 +159,23 @@ export async function correctPayment(input: unknown): Promise<ActionResult> {
     const data = paymentCorrectionSchema.parse(input);
 
     const studentId = await prisma.$transaction(async (tx) => {
-      const original = await tx.payment.findFirstOrThrow({ where: { id: data.paymentId, tenantId } });
+      const original = await tx.payment.findFirstOrThrow({
+        where: { id: data.paymentId, tenantId },
+        include: { corrections: { select: { id: true } } },
+      });
+
+      // A correction is itself a ledger row; correcting one would make the
+      // trail impossible to read. Correct the original again instead.
+      if (original.correctionOfId) {
+        throw new Error("This entry is already a correction. Correct the original receipt instead.");
+      }
+      if (original.corrections.length > 0) {
+        throw new Error("This payment has already been corrected. Log a new payment if more was collected.");
+      }
+      if (data.correctedAmount < 0) {
+        throw new Error("A corrected amount can't be negative.");
+      }
+
       const delta = data.correctedAmount - Number(original.amount);
 
       const correction = await tx.payment.create({
@@ -131,6 +190,7 @@ export async function correctPayment(input: unknown): Promise<ActionResult> {
           collectedById: session.user.id,
           note: data.note,
           correctionOfId: original.id,
+          receiptNumber: original.receiptNumber ? `${original.receiptNumber}-R` : null,
         },
       });
 

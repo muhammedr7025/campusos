@@ -9,14 +9,24 @@ import { EmptyState } from "@/components/layout/empty-state";
 import { FeeStructureFormDialog } from "@/components/finance/fee-structure-form-dialog";
 import { DeleteFeeStructureButton } from "@/components/finance/delete-fee-structure-button";
 import { PageHeader } from "@/components/layout/page-header";
+import { FilterPills } from "@/components/layout/filter-pills";
 
-export default async function FeeStructuresPage() {
+export default async function FeeStructuresPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | undefined>>;
+}) {
   await requireRole(Role.SUPER_ADMIN, Role.FINANCE);
   const tenantId = await getTenantId();
+  const params = await searchParams;
+
+  const allCourses = await prisma.course.findMany({ where: { tenantId }, select: { name: true }, orderBy: { name: "asc" } });
+  const courseNames = allCourses.map((c) => c.name);
+  const filter = params.course && courseNames.includes(params.course) ? params.course : "All";
 
   const [structures, courses, students] = await Promise.all([
     prisma.feeStructure.findMany({
-      where: { tenantId },
+      where: { tenantId, ...(filter === "All" ? {} : { course: { name: filter } }) },
       include: { course: true, installments: { orderBy: { sequence: "asc" } }, _count: { select: { feePlans: true } } },
       orderBy: { createdAt: "desc" },
     }),
@@ -40,6 +50,8 @@ export default async function FeeStructuresPage() {
         description="Per-course billing plans, applied automatically at admission."
         actions={<FeeStructureFormDialog courses={courses.map((c) => ({ id: c.id, name: c.name }))} />}
       />
+
+      {courseNames.length > 1 && <FilterPills options={["All", ...courseNames]} active={filter} paramKey="course" />}
 
       {structures.length === 0 ? (
         <EmptyState
