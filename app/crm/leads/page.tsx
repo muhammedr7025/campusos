@@ -59,7 +59,12 @@ export default async function LeadsPage({
   return (
     <div className="flex flex-col gap-6">
       <PageHeader crumb="CRM" title="Lead pipeline" description="Follow every inquiry until it converts or is explicitly lost." />
-      <LeadsView leads={rows} courses={courses} counselors={counselors} />
+      <LeadsView
+        leads={rows}
+        courses={courses}
+        counselors={counselors}
+        initialView={params.view === "table" ? "table" : "kanban"}
+      />
     </div>
   );
 }

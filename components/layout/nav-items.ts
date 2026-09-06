@@ -18,11 +18,15 @@ import {
   Megaphone,
   ScrollText,
   History,
+  UserRound,
+  Table2,
 } from "lucide-react";
 import type { NavItem } from "@/components/layout/app-shell";
 import { ROLE_VALUES, type RoleValue } from "@/lib/constants/roles";
 
 export type NavGroup = { label: string; items: NavItem[] };
+
+const MY_PROFILE: NavItem = { href: "/profile", label: "My profile", icon: UserRound };
 
 export const ADMIN_NAV: NavGroup[] = [
   { label: "Overview", items: [{ href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard }] },
@@ -36,13 +40,41 @@ export const ADMIN_NAV: NavGroup[] = [
     ],
   },
   {
+    label: "People",
+    items: [
+      { href: "/admissions/students", label: "Students", icon: UserPlus },
+      { href: "/admin/users", label: "Users & roles", icon: Users },
+      { href: "/teacher/notes", label: "Subject notes", icon: BookOpen },
+      { href: "/teacher/exams", label: "Exam schedule", icon: ScrollText },
+    ],
+  },
+  {
+    label: "Finance",
+    items: [
+      { href: "/finance/dashboard", label: "Collections", icon: LayoutDashboard },
+      { href: "/finance/fee-structures", label: "Fee structures", icon: Wallet },
+      { href: "/finance/payments", label: "Payment ledger", icon: Receipt },
+      { href: "/finance/reports", label: "Collection report", icon: BarChart3 },
+      { href: "/finance/discounts", label: "Discount approvals", icon: ScrollText },
+    ],
+  },
+  {
+    label: "CRM",
+    items: [
+      { href: "/crm/leads", label: "Pipeline board", icon: Contact },
+      { href: "/crm/leads?view=table", label: "All leads", icon: Table2 },
+      { href: "/crm/import", label: "Bulk import", icon: UserPlus },
+      { href: "/crm/sources", label: "Source performance", icon: BarChart3 },
+    ],
+  },
+  {
     label: "Governance",
     items: [
-      { href: "/admin/users", label: "Users & roles", icon: Users },
       { href: "/admin/announcements", label: "Announcements", icon: Megaphone },
-      { href: "/admin/reports", label: "Reports", icon: BarChart3 },
       { href: "/admin/audit", label: "Audit log", icon: History },
+      { href: "/admin/reports", label: "Institute reports", icon: BarChart3 },
       { href: "/admin/settings/branding", label: "Branding", icon: Palette },
+      MY_PROFILE,
     ],
   },
 ];
@@ -65,6 +97,7 @@ export const FINANCE_NAV: NavGroup[] = [
       { href: "/finance/reports", label: "Collection report", icon: BarChart3 },
     ],
   },
+  { label: "Me", items: [MY_PROFILE] },
 ];
 
 export const CRM_NAV: NavGroup[] = [
@@ -82,6 +115,7 @@ export const CRM_NAV: NavGroup[] = [
       { href: "/crm/lost", label: "Lost reasons", icon: History },
     ],
   },
+  { label: "Me", items: [MY_PROFILE] },
 ];
 
 export const ADMISSIONS_NAV: NavGroup[] = [
@@ -93,6 +127,7 @@ export const ADMISSIONS_NAV: NavGroup[] = [
       { href: "/admissions/invites", label: "Parent invites", icon: Megaphone },
     ],
   },
+  { label: "Me", items: [MY_PROFILE] },
 ];
 
 export const TEACHER_NAV: NavGroup[] = [
@@ -118,6 +153,7 @@ export const TEACHER_NAV: NavGroup[] = [
       { href: "/teacher/attendance-report", label: "Attendance report", icon: BarChart3 },
     ],
   },
+  { label: "Me", items: [MY_PROFILE] },
 ];
 
 export const PORTAL_NAV: NavGroup[] = [
@@ -136,6 +172,7 @@ export const PORTAL_NAV: NavGroup[] = [
     items: [
       { href: "/portal/fees", label: "Fees", icon: Wallet },
       { href: "/portal/announcements", label: "Announcements", icon: Megaphone },
+      MY_PROFILE,
     ],
   },
 ];
@@ -148,6 +185,17 @@ export const NAV_ITEMS_BY_GROUP = {
   teacher: TEACHER_NAV,
   portal: PORTAL_NAV,
 } as const;
+
+/** Which sidebar a role sees when it lands on a route with no fixed group (e.g. the shared /profile page). */
+export const ROLE_DEFAULT_GROUP: Record<RoleValue, keyof typeof NAV_ITEMS_BY_GROUP> = {
+  [ROLE_VALUES.SUPER_ADMIN]: "admin",
+  [ROLE_VALUES.FINANCE]: "finance",
+  [ROLE_VALUES.COUNSELOR]: "crm",
+  [ROLE_VALUES.ADMISSION_OFFICER]: "admissions",
+  [ROLE_VALUES.TEACHER]: "teacher",
+  [ROLE_VALUES.STUDENT]: "portal",
+  [ROLE_VALUES.PARENT]: "portal",
+};
 
 export const ROLE_LABEL: Record<RoleValue, string> = {
   [ROLE_VALUES.SUPER_ADMIN]: "Super Admin",

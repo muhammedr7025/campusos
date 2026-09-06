@@ -13,12 +13,14 @@ export function LeadsView({
   leads,
   courses,
   counselors,
+  initialView = "kanban",
 }: {
   leads: LeadRow[];
   courses: { id: string; name: string }[];
   counselors: { id: string; name: string }[];
+  initialView?: "kanban" | "table";
 }) {
-  const [view, setView] = useState<"kanban" | "table">("kanban");
+  const [view, setView] = useState<"kanban" | "table">(initialView);
 
   return (
     <div className="flex flex-col gap-4">

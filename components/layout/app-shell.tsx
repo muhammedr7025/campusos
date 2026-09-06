@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { Menu, Search, LogOut, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ export type NavItem = {
 
 function NavLinks({ groups, onNavigate }: { groups: NavGroup[]; onNavigate?: () => void }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   return (
     <nav className="flex flex-col gap-4">
@@ -32,7 +33,15 @@ function NavLinks({ groups, onNavigate }: { groups: NavGroup[]; onNavigate?: () 
             {group.label}
           </div>
           {group.items.map((item) => {
-            const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+            // Nav hrefs with a query string (e.g. two entries pointing at the
+            // same route with different `?view=`) need an exact query match;
+            // plain hrefs ignore the current query so page-owned filters
+            // (?role=, ?date=, ...) don't break their own sidebar highlight.
+            const [itemPath, itemQuery] = item.href.includes("?") ? item.href.split("?") : [item.href, null];
+            const active =
+              itemQuery !== null
+                ? pathname === itemPath && searchParams.toString() === itemQuery
+                : pathname === itemPath || pathname.startsWith(`${itemPath}/`);
             const Icon = item.icon;
             return (
               <Link

@@ -6,11 +6,14 @@ export function StatCard({
   value,
   sub,
   icon: Icon,
+  progress,
 }: {
   label: string;
   value: string | number;
   sub?: string;
   icon?: LucideIcon;
+  /** 0-100. Renders a thin fill bar under the sub-label, e.g. "66% of billed". */
+  progress?: number;
 }) {
   return (
     <Card className="gap-2 py-4">
@@ -21,6 +24,14 @@ export function StatCard({
         </div>
         <div className="font-heading text-[32px] leading-none tabular-nums">{value}</div>
         {sub && <div className="text-muted-foreground text-[12.5px] leading-snug">{sub}</div>}
+        {progress != null && (
+          <div className="bg-muted mt-0.5 h-1.5 w-full overflow-hidden rounded-full">
+            <div
+              className="bg-primary h-full rounded-full"
+              style={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
+            />
+          </div>
+        )}
       </CardContent>
     </Card>
   );
