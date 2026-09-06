@@ -21,6 +21,7 @@ import {
   UserRound,
   Table2,
   CalendarClock,
+  FileCheck,
 } from "lucide-react";
 import type { NavItem } from "@/components/layout/app-shell";
 import { ROLE_VALUES, type RoleValue } from "@/lib/constants/roles";
@@ -157,14 +158,16 @@ export const TEACHER_NAV: NavGroup[] = [
   {
     label: "Teaching",
     items: [
-      { href: "/teacher/timetable", label: "Timetable", icon: CalendarDays },
-      { href: "/teacher/attendance", label: "Attendance", icon: ClipboardList },
+      { href: "/teacher/attendance", label: "Mark attendance", icon: ClipboardList },
+      { href: "/teacher/timetable", label: "My timetable", icon: CalendarDays },
+      { href: "/teacher/classes", label: "My classes", icon: Layers },
     ],
   },
   {
     label: "Academics",
     items: [
       { href: "/teacher/assignments", label: "Assignments", icon: FileText },
+      { href: "/teacher/grading", label: "Grading", icon: FileCheck },
       { href: "/teacher/exams", label: "Exams & marks", icon: ScrollText },
       { href: "/teacher/notes", label: "Subject notes", icon: BookOpen },
     ],
@@ -179,22 +182,59 @@ export const TEACHER_NAV: NavGroup[] = [
   { label: "Me", items: [MY_PROFILE] },
 ];
 
-export const PORTAL_NAV: NavGroup[] = [
-  { label: "Overview", items: [{ href: "/portal/dashboard", label: "Dashboard", icon: LayoutDashboard }] },
+/**
+ * Student and parent share the /portal routes but not the reading of them:
+ * a student is looking at their own week, a parent at their children. The
+ * pages adapt by role; the nav says so plainly.
+ */
+export const STUDENT_NAV: NavGroup[] = [
+  {
+    label: "My studies",
+    items: [
+      { href: "/portal/dashboard", label: "Home", icon: LayoutDashboard },
+      { href: "/portal/timetable", label: "Timetable", icon: CalendarDays },
+      { href: "/portal/assignments", label: "Assignments", icon: FileText },
+    ],
+  },
   {
     label: "Academics",
     items: [
-      { href: "/portal/attendance", label: "Attendance", icon: ClipboardList },
-      { href: "/portal/assignments", label: "Assignments", icon: FileText },
-      { href: "/portal/exams", label: "Exams & results", icon: ScrollText },
       { href: "/portal/notes", label: "Subject notes", icon: BookOpen },
+      { href: "/portal/exams", label: "Exam schedule", icon: CalendarClock },
+      { href: "/portal/exams?view=results", label: "My marks", icon: ScrollText },
+      { href: "/portal/attendance", label: "My attendance", icon: ClipboardList },
     ],
   },
   {
     label: "Account",
     items: [
-      { href: "/portal/fees", label: "Fees", icon: Wallet },
-      { href: "/portal/announcements", label: "Announcements", icon: Megaphone },
+      { href: "/portal/fees", label: "Fees & receipts", icon: Wallet },
+      { href: "/portal/announcements", label: "Notices", icon: Megaphone },
+      MY_PROFILE,
+    ],
+  },
+];
+
+export const PARENT_NAV: NavGroup[] = [
+  {
+    label: "Family",
+    items: [
+      { href: "/portal/dashboard", label: "Overview", icon: LayoutDashboard },
+      { href: "/portal/attendance", label: "Attendance", icon: ClipboardList },
+      { href: "/portal/assignments", label: "Assignments", icon: FileText },
+      { href: "/portal/exams", label: "Results", icon: ScrollText },
+    ],
+  },
+  {
+    label: "Money",
+    items: [{ href: "/portal/fees", label: "Fee plan & dues", icon: Wallet }],
+  },
+  {
+    label: "School",
+    items: [
+      { href: "/portal/contacts", label: "Teacher contacts", icon: Contact },
+      { href: "/portal/notes", label: "Subject notes", icon: BookOpen },
+      { href: "/portal/announcements", label: "Notices", icon: Megaphone },
       MY_PROFILE,
     ],
   },
@@ -206,7 +246,8 @@ export const NAV_ITEMS_BY_GROUP = {
   crm: CRM_NAV,
   admissions: ADMISSIONS_NAV,
   teacher: TEACHER_NAV,
-  portal: PORTAL_NAV,
+  student: STUDENT_NAV,
+  parent: PARENT_NAV,
 } as const;
 
 /**
@@ -223,8 +264,8 @@ export const ROLE_DEFAULT_GROUP: Record<RoleValue, keyof typeof NAV_ITEMS_BY_GRO
   [ROLE_VALUES.COUNSELOR]: "crm",
   [ROLE_VALUES.ADMISSION_OFFICER]: "admissions",
   [ROLE_VALUES.TEACHER]: "teacher",
-  [ROLE_VALUES.STUDENT]: "portal",
-  [ROLE_VALUES.PARENT]: "portal",
+  [ROLE_VALUES.STUDENT]: "student",
+  [ROLE_VALUES.PARENT]: "parent",
 };
 
 export const GROUP_LABEL: Record<keyof typeof NAV_ITEMS_BY_GROUP, string> = {
@@ -233,7 +274,8 @@ export const GROUP_LABEL: Record<keyof typeof NAV_ITEMS_BY_GROUP, string> = {
   crm: "CRM",
   admissions: "Admissions",
   teacher: "Teacher",
-  portal: "Student & Parent Portal",
+  student: "Student portal",
+  parent: "Parent portal",
 };
 
 export const ROLE_LABEL: Record<RoleValue, string> = {
