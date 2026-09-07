@@ -7,6 +7,7 @@ import { requirePermission } from "@/lib/rbac/guard";
 import { writeAuditLog } from "@/lib/audit";
 import { getCurrentFeePlanForStudent } from "@/lib/fees/balance";
 import { discountRequestSchema } from "@/lib/validators/discounts";
+import { assertOwned } from "@/lib/rbac/ownership";
 import { actionError, type ActionResult } from "@/lib/actions/types";
 
 export async function requestDiscount(input: unknown): Promise<ActionResult<{ id: string }>> {
@@ -14,6 +15,8 @@ export async function requestDiscount(input: unknown): Promise<ActionResult<{ id
     const session = await requirePermission("discount:request");
     const tenantId = await getTenantId();
     const data = discountRequestSchema.parse(input);
+
+    await assertOwned(tenantId, { student: data.studentId });
 
     const request = await prisma.$transaction(async (tx) => {
       const created = await tx.discountRequest.create({

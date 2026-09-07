@@ -7,6 +7,7 @@ import { requirePermission } from "@/lib/rbac/guard";
 import { writeAuditLog } from "@/lib/audit";
 import { notifier } from "@/lib/notifications";
 import { examSchema, recordMarkSchema } from "@/lib/validators/exams";
+import { assertOwned } from "@/lib/rbac/ownership";
 import { actionError, type ActionResult } from "@/lib/actions/types";
 
 export async function createExam(input: unknown): Promise<ActionResult<{ id: string }>> {
@@ -14,6 +15,8 @@ export async function createExam(input: unknown): Promise<ActionResult<{ id: str
     const session = await requirePermission("exam:manage");
     const tenantId = await getTenantId();
     const data = examSchema.parse(input);
+
+    await assertOwned(tenantId, { division: data.divisionId, subject: data.subjectId });
 
     const exam = await prisma.$transaction(async (tx) => {
       const created = await tx.exam.create({

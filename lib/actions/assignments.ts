@@ -16,6 +16,7 @@ import {
 } from "@/lib/validators/assignments";
 import { Role } from "@/generated/prisma/client";
 import { BusinessRuleError } from "@/lib/actions/errors";
+import { assertOwned } from "@/lib/rbac/ownership";
 import { actionError, type ActionResult } from "@/lib/actions/types";
 
 export async function createAssignment(formData: FormData): Promise<ActionResult<{ id: string }>> {
@@ -30,6 +31,8 @@ export async function createAssignment(formData: FormData): Promise<ActionResult
       description: formData.get("description") || undefined,
       dueDate: formData.get("dueDate"),
     });
+
+    await assertOwned(tenantId, { division: data.divisionId, subject: data.subjectId });
 
     const file = formData.get("attachment") as File | null;
     let attachmentUrl: string | null = null;

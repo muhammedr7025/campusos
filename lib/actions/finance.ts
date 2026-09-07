@@ -14,6 +14,7 @@ import {
   feePlanOverrideSchema,
 } from "@/lib/validators/finance";
 import { BusinessRuleError } from "@/lib/actions/errors";
+import { assertOwned } from "@/lib/rbac/ownership";
 import { actionError, type ActionResult } from "@/lib/actions/types";
 import type { Prisma } from "@/generated/prisma/client";
 
@@ -22,6 +23,8 @@ export async function createFeeStructure(input: unknown): Promise<ActionResult<{
     const session = await requirePermission("fee-structure:manage");
     const tenantId = await getTenantId();
     const data = feeStructureSchema.parse(input);
+
+    await assertOwned(tenantId, { course: data.courseId });
 
     const totalAmount = data.installments.reduce((sum, i) => sum + i.amount, 0);
 
@@ -222,6 +225,8 @@ export async function createFeePlanOverride(input: unknown): Promise<ActionResul
     const tenantId = await getTenantId();
     const data = feePlanOverrideSchema.parse(input);
 
+    await assertOwned(tenantId, { student: data.studentId });
+
     const plan = await prisma.$transaction(async (tx) => {
       const created = await tx.feePlan.create({
         data: {
@@ -263,6 +268,8 @@ export async function updateFeeStructure(feeStructureId: string, input: unknown)
     const session = await requirePermission("fee-structure:manage");
     const tenantId = await getTenantId();
     const data = feeStructureSchema.parse(input);
+
+    await assertOwned(tenantId, { course: data.courseId });
 
     const totalAmount = data.installments.reduce((sum, i) => sum + i.amount, 0);
 

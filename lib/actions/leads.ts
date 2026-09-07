@@ -13,6 +13,7 @@ import {
   bulkImportSchema,
   type BulkImportRow,
 } from "@/lib/validators/leads";
+import { assertOwned } from "@/lib/rbac/ownership";
 import { actionError, type ActionResult } from "@/lib/actions/types";
 
 export async function createLead(input: unknown): Promise<ActionResult<{ id: string }>> {
@@ -20,6 +21,8 @@ export async function createLead(input: unknown): Promise<ActionResult<{ id: str
     const session = await requirePermission("lead:manage");
     const tenantId = await getTenantId();
     const data = leadSchema.parse(input);
+
+    await assertOwned(tenantId, { course: data.interestedCourseId, user: data.assignedCounselorId });
 
     const lead = await prisma.$transaction(async (tx) => {
       const created = await tx.lead.create({
@@ -151,6 +154,8 @@ export async function updateLead(leadId: string, input: unknown): Promise<Action
     const session = await requirePermission("lead:manage");
     const tenantId = await getTenantId();
     const data = leadSchema.parse(input);
+
+    await assertOwned(tenantId, { course: data.interestedCourseId, user: data.assignedCounselorId });
 
     await prisma.$transaction(async (tx) => {
       const before = await tx.lead.findFirstOrThrow({ where: { id: leadId, tenantId } });

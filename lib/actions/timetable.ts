@@ -6,6 +6,7 @@ import { getTenantId } from "@/lib/tenant";
 import { requirePermission } from "@/lib/rbac/guard";
 import { writeAuditLog } from "@/lib/audit";
 import { timetableSchema } from "@/lib/validators/timetable";
+import { assertOwned } from "@/lib/rbac/ownership";
 import { actionError, type ActionResult } from "@/lib/actions/types";
 
 export async function createTimetableEntry(input: unknown): Promise<ActionResult<{ id: string }>> {
@@ -13,6 +14,8 @@ export async function createTimetableEntry(input: unknown): Promise<ActionResult
     const session = await requirePermission("timetable:manage");
     const tenantId = await getTenantId();
     const data = timetableSchema.parse(input);
+
+    await assertOwned(tenantId, { division: data.divisionId, subject: data.subjectId, teacher: data.teacherId });
 
     // Flag double-booking a teacher at creation time (PRD §6.7 acceptance criteria).
     const overlapping = await prisma.timetable.findFirst({
@@ -53,6 +56,8 @@ export async function updateTimetableEntry(id: string, input: unknown): Promise<
     const session = await requirePermission("timetable:manage");
     const tenantId = await getTenantId();
     const data = timetableSchema.parse(input);
+
+    await assertOwned(tenantId, { division: data.divisionId, subject: data.subjectId, teacher: data.teacherId });
 
     const overlapping = await prisma.timetable.findFirst({
       where: {

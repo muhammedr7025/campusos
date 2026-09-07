@@ -7,6 +7,8 @@ import { requirePermission } from "@/lib/rbac/guard";
 import { writeAuditLog } from "@/lib/audit";
 import { notifier } from "@/lib/notifications";
 import { markAttendanceSchema, ATTENDANCE_ALERT_THRESHOLD } from "@/lib/validators/attendance";
+import { ENROLLED_STUDENT_WHERE } from "@/lib/academics/enrollment";
+import { BusinessRuleError } from "@/lib/actions/errors";
 import { actionError, type ActionResult } from "@/lib/actions/types";
 
 async function checkAttendanceDropAndNotify(tenantId: string, studentId: string) {
@@ -45,6 +47,29 @@ export async function markAttendance(input: unknown): Promise<ActionResult> {
     const session = await requirePermission("attendance:mark");
     const tenantId = await getTenantId();
     const data = markAttendanceSchema.parse(input);
+
+    // Every id on this sheet arrived from the browser. Nothing downstream
+    // checks them, so without this a stale (or hand-made) request could
+    // write attendance against another institute's student, or against a
+    // student who has since been moved out of the division being marked.
+    const [division, subject] = await Promise.all([
+      prisma.division.findFirst({ where: { id: data.divisionId, tenantId }, select: { id: true } }),
+      prisma.subject.findFirst({ where: { id: data.subjectId, tenantId }, select: { id: true } }),
+    ]);
+    if (!division) throw new BusinessRuleError("That division isn't part of this institute.");
+    if (!subject) throw new BusinessRuleError("That subject isn't part of this institute.");
+
+    const roster = await prisma.student.findMany({
+      where: { tenantId, divisionId: data.divisionId, ...ENROLLED_STUDENT_WHERE },
+      select: { id: true },
+    });
+    const rosterIds = new Set(roster.map((s) => s.id));
+    if (data.entries.some((entry) => !rosterIds.has(entry.studentId))) {
+      throw new BusinessRuleError(
+        "This sheet lists someone who isn't in the division any more. Reload the page and mark it again.",
+      );
+    }
+
     const date = new Date(`${data.date}T00:00:00`);
     const today = new Date(new Date().toDateString());
     const isBackdated = date.getTime() !== today.getTime();

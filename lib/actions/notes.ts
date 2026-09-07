@@ -7,6 +7,7 @@ import { requirePermission } from "@/lib/rbac/guard";
 import { writeAuditLog } from "@/lib/audit";
 import { storage } from "@/lib/storage";
 import { subjectNoteSchema } from "@/lib/validators/notes";
+import { assertOwned } from "@/lib/rbac/ownership";
 import { actionError, type ActionResult } from "@/lib/actions/types";
 
 const MAX_NOTE_FILE_BYTES = 20 * 1024 * 1024;
@@ -40,6 +41,8 @@ export async function createSubjectNote(input: unknown): Promise<ActionResult<{ 
     }
 
     const data = subjectNoteSchema.parse(fields);
+
+    await assertOwned(tenantId, { course: data.courseId, subject: data.subjectId });
 
     if (file) {
       if (!ALLOWED_NOTE_TYPES.includes(file.type)) {
