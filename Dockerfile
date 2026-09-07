@@ -12,6 +12,12 @@ COPY . .
 ARG NEXT_PUBLIC_ROOT_DOMAIN
 ENV NEXT_PUBLIC_ROOT_DOMAIN=$NEXT_PUBLIC_ROOT_DOMAIN
 ENV DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"
+# Bound the build's heap. On a small VPS an unbounded Next build takes the
+# whole box with it — the running app, sshd and all — and twice in this
+# project's life that meant an outage lasting hours with no way in. A build
+# that fails for want of memory is recoverable; a machine that stops
+# answering is not. Raise this only alongside more RAM (or swap).
+ENV NODE_OPTIONS=--max-old-space-size=1024
 RUN npx prisma generate
 RUN npm run build
 
