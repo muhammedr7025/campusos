@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { ENROLLED_STUDENT_WHERE } from "@/lib/academics/enrollment";
 import { Role } from "@/generated/prisma/client";
 import { getFeeSummaryForTenant } from "@/lib/fees/balance";
-import { attendancePercent } from "@/lib/academics/attendance";
+import { percentByKey } from "@/lib/academics/attendance";
 import { StudentsTable, type StudentRow } from "@/components/admissions/students-table";
 import { AdmitStudentDialog } from "@/components/admissions/admit-student-dialog";
 import { PageHeader } from "@/components/layout/page-header";
@@ -33,7 +33,7 @@ export default async function StudentsPage({
       },
       orderBy: { createdAt: "desc" },
     }),
-    prisma.attendance.findMany({ where: { tenantId }, select: { studentId: true, status: true } }),
+    prisma.attendance.groupBy({ by: ["studentId", "status"], where: { tenantId }, _count: { _all: true } }),
     getFeeSummaryForTenant(tenantId),
     prisma.course.findMany({
       where: { tenantId },
@@ -49,8 +49,9 @@ export default async function StudentsPage({
   const balanceByStudent = new Map<string, number>();
   for (const p of plans) balanceByStudent.set(p.studentId, (balanceByStudent.get(p.studentId) ?? 0) + p.balance);
 
+  const attendanceByStudent = percentByKey(attendance, "studentId");
+
   const allRows: StudentRow[] = students.map((s) => {
-    const own = attendance.filter((a) => a.studentId === s.id);
     return {
       id: s.id,
       name: s.name,
@@ -59,7 +60,7 @@ export default async function StudentsPage({
       divisionName: s.division?.name ?? null,
       guardianName: s.guardians[0]?.guardian.name ?? null,
       guardianPhone: s.guardians[0]?.guardian.phone ?? null,
-      attendancePct: attendancePercent(own),
+      attendancePct: attendanceByStudent.get(s.id) ?? null,
       balance: balanceByStudent.get(s.id) ?? 0,
       status: s.status,
     };

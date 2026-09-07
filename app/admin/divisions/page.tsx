@@ -4,7 +4,7 @@ import { getTenantId } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
 import { ENROLLED_STUDENT_WHERE } from "@/lib/academics/enrollment";
 import { Role } from "@/generated/prisma/client";
-import { attendancePercent } from "@/lib/academics/attendance";
+import { percentByKey } from "@/lib/academics/attendance";
 import { capacityState } from "@/lib/academics/capacity";
 import { DivisionsTable, type DivisionRow } from "@/components/admin/divisions/divisions-table";
 import { FilterPills } from "@/components/layout/filter-pills";
@@ -31,8 +31,10 @@ export default async function DivisionsPage({
       where: { tenantId },
       select: { divisionId: true, room: true, teacher: { select: { name: true } } },
     }),
-    prisma.attendance.findMany({ where: { tenantId }, select: { divisionId: true, status: true } }),
+    prisma.attendance.groupBy({ by: ["divisionId", "status"], where: { tenantId }, _count: { _all: true } }),
   ]);
+
+  const attendanceByDivision = percentByKey(attendance, "divisionId");
 
   const courseNames = courses.map((c) => c.name);
   const filterOptions = ["All", "Open", "Full", ...courseNames];
@@ -51,7 +53,7 @@ export default async function DivisionsPage({
       capacityState: capacityState(d._count.students, d.capacity),
       faculty,
       rooms,
-      attendancePct: attendancePercent(attendance.filter((a) => a.divisionId === d.id)),
+      attendancePct: attendanceByDivision.get(d.id) ?? null,
     };
   });
 

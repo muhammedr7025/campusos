@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { ENROLLED_STUDENT_WHERE } from "@/lib/academics/enrollment";
 import { Role } from "@/generated/prisma/client";
 import { PageHeader } from "@/components/layout/page-header";
-import { attendancePercent } from "@/lib/academics/attendance";
+import { percentByKey } from "@/lib/academics/attendance";
 import { MyStudentsTable, type MyStudentRow } from "@/components/teacher/my-students-table";
 
 export default async function MyStudentsPage() {
@@ -34,7 +34,7 @@ export default async function MyStudentsPage() {
   const divisionIds = [...new Set(students.map((s) => s.divisionId).filter((id): id is string => !!id))];
 
   const [attendance, assignments, submissions, marks] = await Promise.all([
-    prisma.attendance.findMany({ where: { tenantId, studentId: { in: studentIds } }, select: { studentId: true, status: true } }),
+    prisma.attendance.groupBy({ by: ["studentId", "status"], where: { tenantId, studentId: { in: studentIds } }, _count: { _all: true } }),
     prisma.assignment.findMany({ where: { tenantId, divisionId: { in: divisionIds } }, select: { id: true, divisionId: true } }),
     prisma.submission.findMany({
       where: { tenantId, studentId: { in: studentIds }, status: { not: "MISSING" } },
@@ -46,12 +46,14 @@ export default async function MyStudentsPage() {
     }),
   ]);
 
+  const attendanceByStudent = percentByKey(attendance, "studentId");
+
   const postedByDivision = new Map<string, number>();
   for (const a of assignments) postedByDivision.set(a.divisionId, (postedByDivision.get(a.divisionId) ?? 0) + 1);
   const postedAssignmentIds = new Set(assignments.map((a) => a.id));
 
   const rows: MyStudentRow[] = students.map((s) => {
-    const attPct = attendancePercent(attendance.filter((a) => a.studentId === s.id));
+    const attPct = attendanceByStudent.get(s.id) ?? null;
 
     const posted = s.divisionId ? (postedByDivision.get(s.divisionId) ?? 0) : 0;
     const submitted = submissions.filter((sub) => sub.studentId === s.id && postedAssignmentIds.has(sub.assignmentId)).length;

@@ -5,7 +5,7 @@ import { getTenantId } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
 import { Role } from "@/generated/prisma/client";
 import { ENROLLED_STUDENT_WHERE } from "@/lib/academics/enrollment";
-import { attendancePercent } from "@/lib/academics/attendance";
+import { percentByKey } from "@/lib/academics/attendance";
 import { DAY_LABELS } from "@/lib/validators/timetable";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/layout/empty-state";
@@ -36,10 +36,12 @@ export default async function MyClassesPage() {
   });
 
   const divisionIds = [...new Set(slots.map((s) => s.divisionId))];
-  const attendance = await prisma.attendance.findMany({
+  const attendance = await prisma.attendance.groupBy({
+    by: ["divisionId", "status"],
     where: { tenantId, divisionId: { in: divisionIds } },
-    select: { divisionId: true, status: true },
+    _count: { _all: true },
   });
+  const attendanceByDivision = percentByKey(attendance, "divisionId");
 
   const classes = divisionIds.map((id) => {
     const mine = slots.filter((s) => s.divisionId === id);
@@ -51,7 +53,7 @@ export default async function MyClassesPage() {
       students: division._count.students,
       subjects: [...new Set(mine.map((s) => s.subject.name))],
       slots: mine,
-      attendancePct: attendancePercent(attendance.filter((a) => a.divisionId === id)),
+      attendancePct: attendanceByDivision.get(id) ?? null,
     };
   });
 
