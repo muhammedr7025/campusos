@@ -76,11 +76,21 @@ describe("a dialog taller than the viewport", () => {
 
     const content = screen.getByRole("dialog");
 
-    // Without these the dialog grows past the top of the window and the X —
+    // Without this the dialog grows past the top of the window and the X —
     // positioned at its top-right — becomes unreachable, with body scroll
     // locked behind the overlay.
     expect(content.className).toMatch(/max-h-/);
-    expect(content.className).toMatch(/overflow-y-auto/);
+
+    // The body scrolls, not the dialog box itself...
+    const body = content.querySelector('[data-slot="dialog-body"]');
+    expect(body).not.toBeNull();
+    expect(body!.className).toMatch(/overflow-y-auto/);
+
+    // ...so that the close button, which sits outside the scrolling region,
+    // is still on screen after the user has scrolled to the bottom.
+    const close = content.querySelector('[data-slot="dialog-close"]');
+    expect(close).not.toBeNull();
+    expect(body!.contains(close)).toBe(false);
   });
 
   it("still closes from the X", async () => {

@@ -62,7 +62,7 @@ export function FeePlanOverrideDialog({ studentId }: { studentId: string }) {
           <Percent /> Custom plan / discount
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[85vh] overflow-y-auto">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>Create custom fee plan</DialogTitle>
           <DialogDescription>
