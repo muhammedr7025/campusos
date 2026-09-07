@@ -1,4 +1,4 @@
-import { BookOpen } from "lucide-react";
+import { BookOpen, Paperclip } from "lucide-react";
 import { requireRole } from "@/lib/rbac/guard";
 import { getTenantId } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
@@ -59,9 +59,19 @@ export default async function TeacherNotesPage() {
                   <p className="font-medium">{n.title}</p>
                   <p className="text-muted-foreground text-sm">{n.course.name} · {n.subject.name}</p>
                   {n.text && <p className="text-muted-foreground mt-1 text-sm">{n.text}</p>}
-                  <div className="mt-2 flex items-center gap-2">
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
                     <Badge variant="secondary">{n.kind.replace("_", " ")}</Badge>
                     {n.pages != null && <span className="text-muted-foreground text-xs">{n.pages} pp</span>}
+                    {n.fileUrl && (
+                      <a
+                        href={n.fileUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-primary inline-flex items-center gap-1 text-xs hover:underline"
+                      >
+                        <Paperclip className="size-3" /> Attachment
+                      </a>
+                    )}
                   </div>
                 </div>
                 <DeleteNoteButton id={n.id} title={n.title} />

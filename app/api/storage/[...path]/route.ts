@@ -1,42 +1,42 @@
 import { NextResponse } from "next/server";
 import { readFile } from "node:fs/promises";
-import path from "node:path";
 import { requireSession } from "@/lib/rbac/guard";
-
-const ROOT = path.resolve(process.env.STORAGE_LOCAL_DIR ?? "./storage");
-
-const CONTENT_TYPES: Record<string, string> = {
-  ".pdf": "application/pdf",
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".webp": "image/webp",
-  ".gif": "image/gif",
-};
+import { canReadStoredFile } from "@/lib/storage/access";
+import { contentTypeFor, resolveStoredPath, storageUrl, PUBLIC_CATEGORIES } from "@/lib/storage/paths";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ path: string[] }> }) {
-  const session = await requireSession().catch(() => null);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
   const { path: segments } = await params;
-  const [tenantId] = segments;
-  if (tenantId !== session.user.tenantId) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const [tenantId, category] = segments;
+
+  const resolved = resolveStoredPath(segments);
+  if (!resolved || !tenantId || !category) {
+    return NextResponse.json({ error: "Invalid path" }, { status: 400 });
   }
 
-  const relative = segments.join("/");
-  const resolved = path.resolve(ROOT, relative);
-  if (!resolved.startsWith(ROOT)) {
-    return NextResponse.json({ error: "Invalid path" }, { status: 400 });
+  const isPublic = PUBLIC_CATEGORIES.includes(category);
+  if (!isPublic) {
+    const session = await requireSession().catch(() => null);
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (tenantId !== session.user.tenantId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    const allowed = await canReadStoredFile({
+      tenantId,
+      category,
+      url: storageUrl(segments),
+      viewer: { id: session.user.id, role: session.user.role },
+    });
+    if (!allowed) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   try {
     const buffer = await readFile(resolved);
-    const ext = path.extname(resolved).toLowerCase();
     return new NextResponse(new Uint8Array(buffer), {
       headers: {
-        "Content-Type": CONTENT_TYPES[ext] ?? "application/octet-stream",
-        "Cache-Control": "private, max-age=3600",
+        "Content-Type": contentTypeFor(resolved),
+        // Inline so a PDF opens in the browser's viewer instead of downloading.
+        "Content-Disposition": "inline",
+        "Cache-Control": isPublic ? "public, max-age=3600" : "private, max-age=3600",
       },
     });
   } catch {

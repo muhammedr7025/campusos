@@ -1,4 +1,4 @@
-import { BookOpen, Lock, Users } from "lucide-react";
+import { BookOpen, Lock, Paperclip, Users } from "lucide-react";
 import { requireRole } from "@/lib/rbac/guard";
 import { getTenantId } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
@@ -52,13 +52,24 @@ export default async function PortalNotesPage() {
               <CardContent className="flex flex-col gap-2 p-4">
                 <p className="font-medium">{n.title}</p>
                 <p className="text-muted-foreground text-sm">{n.subject.name}</p>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="secondary">{n.kind.replace("_", " ")}</Badge>
                   {n.pages != null && <span className="text-muted-foreground text-xs">{n.pages} pp</span>}
-                  {locked && (
+                  {locked ? (
                     <Badge variant="destructive" className="gap-1">
                       <Lock className="size-3" /> Locked
                     </Badge>
+                  ) : (
+                    n.fileUrl && (
+                      <a
+                        href={n.fileUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-primary inline-flex items-center gap-1 text-xs hover:underline"
+                      >
+                        <Paperclip className="size-3" /> Open attachment
+                      </a>
+                    )
                   )}
                 </div>
               </CardContent>

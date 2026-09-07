@@ -51,14 +51,27 @@ export function SubjectNoteFormDialog({ courses, subjects }: { courses: CourseOp
   const selectedCourseId = watch("courseId");
   const availableSubjects = useMemo(() => subjects.filter((s) => s.courseId === selectedCourseId), [subjects, selectedCourseId]);
 
+  const [file, setFile] = useState<File | null>(null);
+
   async function onSubmit(values: SubjectNoteInput) {
-    const result = await createSubjectNote(values);
+    // FormData so the PDF rides along with the fields in one request.
+    const payload = new FormData();
+    payload.set("courseId", values.courseId);
+    payload.set("subjectId", values.subjectId);
+    payload.set("title", values.title);
+    payload.set("kind", values.kind);
+    payload.set("text", values.text ?? "");
+    payload.set("pages", values.pages != null ? String(values.pages) : "");
+    if (file) payload.set("file", file);
+
+    const result = await createSubjectNote(payload);
     if (!result.ok) {
       toast.error(result.error);
       return;
     }
-    toast.success("Notes published.");
+    toast.success(file ? "Notes published with attachment." : "Notes published.");
     reset();
+    setFile(null);
     setOpen(false);
     router.refresh();
   }
@@ -136,6 +149,18 @@ export function SubjectNoteFormDialog({ courses, subjects }: { courses: CourseOp
             <Field>
               <FieldLabel htmlFor="text">Description</FieldLabel>
               <Textarea id="text" rows={3} {...register("text")} />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="file">Attachment (optional)</FieldLabel>
+              <Input
+                id="file"
+                type="file"
+                accept="application/pdf,image/png,image/jpeg,image/webp"
+                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              />
+              <p className="text-muted-foreground text-xs">
+                PDF or image, up to 20 MB. Students with a cleared balance can open it.
+              </p>
             </Field>
           </FieldGroup>
           <DialogFooter className="mt-6">

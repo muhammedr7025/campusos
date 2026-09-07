@@ -1,5 +1,12 @@
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { vi } from "vitest";
 import { testActor } from "./helpers/actor";
+
+// Uploads land in a throwaway directory, never the real ./storage tree.
+// Set before any module reads it — STORAGE_ROOT is resolved at import time.
+process.env.STORAGE_LOCAL_DIR ??= mkdtempSync(join(tmpdir(), "campusos-storage-"));
 
 /**
  * Only the edges are faked: Next's cache invalidation (no server to revalidate)

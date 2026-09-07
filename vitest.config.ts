@@ -17,16 +17,35 @@ const TEST_DATABASE_URL =
 
 export default defineConfig({
   test: {
-    environment: "node",
     globals: true,
-    include: ["tests/**/*.test.ts"],
-    setupFiles: ["./tests/setup.ts"],
     env: { DATABASE_URL: TEST_DATABASE_URL, NODE_ENV: "test" },
     // One shared test database — run files serially so they can't race.
     fileParallelism: false,
     sequence: { concurrent: false },
     testTimeout: 30_000,
     hookTimeout: 120_000,
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: "server",
+          environment: "node",
+          include: ["tests/**/*.test.ts"],
+          setupFiles: ["./tests/setup.ts"],
+        },
+      },
+      {
+        // Component tests: real clicks against a real DOM, so a dialog that
+        // renders but doesn't close fails here instead of in someone's hands.
+        extends: true,
+        test: {
+          name: "ui",
+          environment: "jsdom",
+          include: ["tests/**/*.test.tsx"],
+          setupFiles: ["./tests/setup-ui.ts"],
+        },
+      },
+    ],
   },
   resolve: {
     alias: {
