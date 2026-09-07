@@ -1,6 +1,7 @@
 import { requireRole } from "@/lib/rbac/guard";
 import { getTenantId } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
+import { ENROLLED_STUDENT_WHERE } from "@/lib/academics/enrollment";
 import { Role } from "@/generated/prisma/client";
 import { PageHeader } from "@/components/layout/page-header";
 import { DAY_LABELS } from "@/lib/validators/timetable";
@@ -22,7 +23,7 @@ export default async function AttendanceReportPage() {
 
   const [students, attendance] = await Promise.all([
     prisma.student.findMany({
-      where: { tenantId, status: "ACTIVE", divisionId: { in: divisionIds } },
+      where: { tenantId, ...ENROLLED_STUDENT_WHERE, divisionId: { in: divisionIds } },
       select: { id: true, divisionId: true },
     }),
     prisma.attendance.findMany({

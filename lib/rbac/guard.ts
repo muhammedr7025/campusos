@@ -1,22 +1,13 @@
 import "server-only";
 import { auth } from "@/auth";
 import { getTenantId } from "@/lib/tenant";
-import { roleHasPermission, type Permission } from "@/lib/rbac/permissions";
+import { redirect } from "next/navigation";
+import { roleHasPermission, ROLE_HOME, type Permission } from "@/lib/rbac/permissions";
+import { loadActor, sessionRejectionReason } from "@/lib/rbac/actor";
+import { ForbiddenError, UnauthorizedError } from "@/lib/rbac/errors";
 import type { Role } from "@/generated/prisma/client";
 
-export class UnauthorizedError extends Error {
-  constructor(message = "Not signed in") {
-    super(message);
-    this.name = "UnauthorizedError";
-  }
-}
-
-export class ForbiddenError extends Error {
-  constructor(message = "You don't have permission to do this") {
-    super(message);
-    this.name = "ForbiddenError";
-  }
-}
+export { ForbiddenError, UnauthorizedError };
 
 /**
  * The layer that actually enforces security (middleware/UI are UX only).
@@ -33,13 +24,36 @@ export async function requireSession() {
     throw new UnauthorizedError("Session does not match this institute.");
   }
 
-  return session;
+  // The JWT's role and status are a snapshot from sign-in time. Re-read them
+  // so deactivating or demoting someone takes effect on their next request
+  // rather than whenever their token happens to expire.
+  const actor = await loadActor(tenantId, session.user.id);
+  const rejection = sessionRejectionReason(actor);
+  if (rejection) throw new UnauthorizedError(rejection);
+
+  return { ...session, user: { ...session.user, role: actor!.role } };
+}
+
+/**
+ * The page/layout form of requireSession. A page never catches, so a guard
+ * failure there would surface as a crash screen; these two cases aren't
+ * crashes — an expired or revoked session belongs at the login page, and a
+ * role that can't see this section belongs at its own home. Anything else
+ * still throws, because anything else really is a bug.
+ */
+export async function requirePageSession() {
+  try {
+    return await requireSession();
+  } catch (error) {
+    if (error instanceof UnauthorizedError) redirect("/login");
+    throw error;
+  }
 }
 
 export async function requireRole(...roles: Role[]) {
-  const session = await requireSession();
+  const session = await requirePageSession();
   if (!roles.includes(session.user.role)) {
-    throw new ForbiddenError();
+    redirect(ROLE_HOME[session.user.role]);
   }
   return session;
 }

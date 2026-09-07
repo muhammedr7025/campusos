@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { auth } from "@/auth";
+import { requirePageSession } from "@/lib/rbac/guard";
 import { getCurrentTenant, getTenantId } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
 import { AppShell } from "@/components/layout/app-shell";
@@ -18,8 +18,11 @@ import { ROLE_LABEL, ROLE_DEFAULT_GROUP, GROUP_LABEL } from "@/components/layout
  * route's section nav out from under the visitor.
  */
 export async function RoleShell({ children }: { children: React.ReactNode }) {
-  const [session, tenant] = await Promise.all([auth(), getCurrentTenant()]);
-  if (!session?.user || !tenant) redirect("/login");
+  // requirePageSession, not auth(): the role in the token is a snapshot from
+  // sign-in, so a demoted or deactivated user would otherwise keep their old
+  // sidebar (and a live session) until the token expired.
+  const [session, tenant] = await Promise.all([requirePageSession(), getCurrentTenant()]);
+  if (!tenant) redirect("/login");
 
   const effectiveGroup = ROLE_DEFAULT_GROUP[session.user.role];
   const effectiveGroupLabel = GROUP_LABEL[effectiveGroup];

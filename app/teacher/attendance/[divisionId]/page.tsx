@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { requireRole } from "@/lib/rbac/guard";
 import { getTenantId } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
+import { ENROLLED_STUDENT_WHERE } from "@/lib/academics/enrollment";
 import { Role } from "@/generated/prisma/client";
 import { AttendanceRoster } from "@/components/teacher/attendance-roster";
 import type { AttendanceStatus } from "@/generated/prisma/client";
@@ -30,7 +31,7 @@ export default async function AttendanceRosterPage({
   if (!division || !subjectRecord) notFound();
 
   const students = await prisma.student.findMany({
-    where: { tenantId, divisionId, status: "ACTIVE" },
+    where: { tenantId, divisionId, ...ENROLLED_STUDENT_WHERE },
     select: { id: true, name: true, enrollmentNumber: true },
     orderBy: { name: "asc" },
   });

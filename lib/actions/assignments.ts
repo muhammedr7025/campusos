@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { ENROLLED_STUDENT_WHERE } from "@/lib/academics/enrollment";
 import { getTenantId } from "@/lib/tenant";
 import { requirePermission, requireSession } from "@/lib/rbac/guard";
 import { writeAuditLog } from "@/lib/audit";
@@ -14,6 +15,7 @@ import {
   submitAssignmentSchema,
 } from "@/lib/validators/assignments";
 import { Role } from "@/generated/prisma/client";
+import { BusinessRuleError } from "@/lib/actions/errors";
 import { actionError, type ActionResult } from "@/lib/actions/types";
 
 export async function createAssignment(formData: FormData): Promise<ActionResult<{ id: string }>> {
@@ -38,7 +40,7 @@ export async function createAssignment(formData: FormData): Promise<ActionResult
     }
 
     const students = await prisma.student.findMany({
-      where: { tenantId, divisionId: data.divisionId, status: "ACTIVE" },
+      where: { tenantId, divisionId: data.divisionId, ...ENROLLED_STUDENT_WHERE },
       select: { id: true, userId: true, guardians: { include: { guardian: { select: { userId: true } } } } },
     });
 
@@ -193,7 +195,7 @@ export async function updateAssignment(assignmentId: string, input: unknown): Pr
     await prisma.$transaction(async (tx) => {
       const before = await tx.assignment.findFirstOrThrow({ where: { id: assignmentId, tenantId } });
       if (session.user.role !== Role.SUPER_ADMIN && before.teacherId !== session.user.id) {
-        throw new Error("You can only edit assignments you created.");
+        throw new BusinessRuleError("You can only edit assignments you created.");
       }
 
       await tx.assignment.update({

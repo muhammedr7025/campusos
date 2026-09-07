@@ -1,4 +1,4 @@
-import { requireSession } from "@/lib/rbac/guard";
+import { requirePageSession } from "@/lib/rbac/guard";
 import { getTenantId } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/layout/page-header";
@@ -7,7 +7,7 @@ import { ROLE_LABEL } from "@/components/layout/nav-items";
 import { ChangePasswordForm } from "@/components/profile/change-password-form";
 
 export default async function ProfilePage() {
-  const session = await requireSession();
+  const session = await requirePageSession();
   const tenantId = await getTenantId();
 
   const user = await prisma.user.findFirstOrThrow({

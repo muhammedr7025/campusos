@@ -29,19 +29,9 @@ vi.mock("@/lib/tenant", () => ({
 
 vi.mock("@/lib/rbac/guard", async () => {
   const { roleHasPermission } = await import("@/lib/rbac/permissions");
-
-  class UnauthorizedError extends Error {
-    constructor(message = "Not signed in") {
-      super(message);
-      this.name = "UnauthorizedError";
-    }
-  }
-  class ForbiddenError extends Error {
-    constructor(message = "You don't have permission to do this") {
-      super(message);
-      this.name = "ForbiddenError";
-    }
-  }
+  // The real error classes, so `instanceof` in actionError still matches and
+  // a guard failure is reported to tests exactly as it would be to a user.
+  const { UnauthorizedError, ForbiddenError } = await import("@/lib/rbac/errors");
 
   const session = () => ({
     user: {

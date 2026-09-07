@@ -1,5 +1,5 @@
 import { Role } from "@/generated/prisma/client";
-import { requireRole, requireSession } from "@/lib/rbac/guard";
+import { requireRole, requirePageSession } from "@/lib/rbac/guard";
 import { getTenantId } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/layout/page-header";
@@ -21,7 +21,7 @@ export default async function DiscountsPage({
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
   const session = await requireRole(Role.SUPER_ADMIN, Role.FINANCE);
-  await requireSession();
+  await requirePageSession();
   const tenantId = await getTenantId();
   const params = await searchParams;
   const status = (STATUSES as readonly string[]).includes(params.status ?? "") ? params.status! : "All";

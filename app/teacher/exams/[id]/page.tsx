@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { requireRole } from "@/lib/rbac/guard";
 import { getTenantId } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
+import { ENROLLED_STUDENT_WHERE } from "@/lib/academics/enrollment";
 import { Role } from "@/generated/prisma/client";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/layout/empty-state";
@@ -24,7 +25,7 @@ export default async function ExamMarksPage({ params }: { params: Promise<{ id: 
   if (!exam) notFound();
 
   const students = await prisma.student.findMany({
-    where: { tenantId, divisionId: exam.divisionId, status: "ACTIVE" },
+    where: { tenantId, divisionId: exam.divisionId, ...ENROLLED_STUDENT_WHERE },
     select: { id: true, name: true, enrollmentNumber: true },
     orderBy: { name: "asc" },
   });

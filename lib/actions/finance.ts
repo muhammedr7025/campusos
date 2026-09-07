@@ -13,6 +13,7 @@ import {
   paymentCorrectionSchema,
   feePlanOverrideSchema,
 } from "@/lib/validators/finance";
+import { BusinessRuleError } from "@/lib/actions/errors";
 import { actionError, type ActionResult } from "@/lib/actions/types";
 import type { Prisma } from "@/generated/prisma/client";
 
@@ -91,7 +92,7 @@ export async function logPayment(input: unknown): Promise<ActionResult> {
       });
 
       if (data.installmentId && !plan.installments.some((i) => i.id === data.installmentId)) {
-        throw new Error("That installment doesn't belong to this student's fee plan.");
+        throw new BusinessRuleError("That installment doesn't belong to this student's fee plan.");
       }
 
       // Balance is derived, never stored — so the guard recomputes it here
@@ -105,7 +106,7 @@ export async function logPayment(input: unknown): Promise<ActionResult> {
       const paid = priorPayments.reduce((sum, p) => sum + Number(p.amount), 0);
       const outstanding = Number(plan.totalAmount) - paid;
       if (data.amount > outstanding) {
-        throw new Error(
+        throw new BusinessRuleError(
           outstanding <= 0
             ? "This fee plan is already settled in full."
             : `That's more than the ₹${outstanding.toLocaleString("en-IN")} outstanding on this plan.`,
@@ -167,13 +168,13 @@ export async function correctPayment(input: unknown): Promise<ActionResult> {
       // A correction is itself a ledger row; correcting one would make the
       // trail impossible to read. Correct the original again instead.
       if (original.correctionOfId) {
-        throw new Error("This entry is already a correction. Correct the original receipt instead.");
+        throw new BusinessRuleError("This entry is already a correction. Correct the original receipt instead.");
       }
       if (original.corrections.length > 0) {
-        throw new Error("This payment has already been corrected. Log a new payment if more was collected.");
+        throw new BusinessRuleError("This payment has already been corrected. Log a new payment if more was collected.");
       }
       if (data.correctedAmount < 0) {
-        throw new Error("A corrected amount can't be negative.");
+        throw new BusinessRuleError("A corrected amount can't be negative.");
       }
 
       const delta = data.correctedAmount - Number(original.amount);
