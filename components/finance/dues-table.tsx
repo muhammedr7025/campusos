@@ -32,6 +32,16 @@ export function DuesTable({ plans }: { plans: FeePlanSummary[] }) {
       { id: "paid", header: "Paid", cell: ({ row }) => `₹${row.original.paid.toLocaleString("en-IN")}` },
       { id: "balance", header: "Balance", cell: ({ row }) => `₹${row.original.balance.toLocaleString("en-IN")}` },
       {
+        id: "lateFee",
+        header: "Late fee",
+        cell: ({ row }) =>
+          row.original.lateFee > 0 ? (
+            <span className="text-destructive tabular-nums">₹{row.original.lateFee.toLocaleString("en-IN")}</span>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          ),
+      },
+      {
         id: "nextDue",
         header: "Next due",
         cell: ({ row }) => (row.original.nextDueDate ? new Date(row.original.nextDueDate).toLocaleDateString() : "—"),

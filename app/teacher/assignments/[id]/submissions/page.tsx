@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/rbac/guard";
 import { getTenantId } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
 import { Role } from "@/generated/prisma/client";
+import { teachesClass } from "@/lib/academics/teaching";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { GradeSubmissionDialog } from "@/components/teacher/grade-submission-dialog";
@@ -20,7 +21,7 @@ const STATUS_VARIANT: Record<SubmissionStatus, "default" | "secondary" | "outlin
 };
 
 export default async function AssignmentSubmissionsPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireRole(Role.SUPER_ADMIN, Role.TEACHER);
+  const session = await requireRole(Role.SUPER_ADMIN, Role.TEACHER);
   const tenantId = await getTenantId();
   const { id } = await params;
 
@@ -33,6 +34,13 @@ export default async function AssignmentSubmissionsPage({ params }: { params: Pr
     },
   });
   if (!assignment) notFound();
+  if (
+    session.user.role !== Role.SUPER_ADMIN &&
+    assignment.teacherId !== session.user.id &&
+    !(await teachesClass(tenantId, session.user.id, assignment.divisionId, assignment.subjectId))
+  ) {
+    notFound();
+  }
 
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6">

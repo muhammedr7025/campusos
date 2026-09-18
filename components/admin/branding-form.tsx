@@ -91,15 +91,16 @@ export function BrandingForm({ initial }: { initial: BrandingInput }) {
             <FieldError errors={errors.name ? [errors.name] : undefined} />
           </Field>
 
-          <Field>
+          <Field data-invalid={!!errors.logoUrl}>
             <FieldLabel>Logo</FieldLabel>
             <div className="flex items-center gap-2">
-              <Input placeholder="https://…" {...register("logoUrl")} />
-              <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={onLogoFile} />
+              <Input placeholder="Upload a PNG, JPEG or WebP" readOnly {...register("logoUrl")} />
+              <input ref={logoInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={onLogoFile} />
               <Button type="button" variant="outline" onClick={() => logoInputRef.current?.click()} disabled={uploadingLogo}>
                 {uploadingLogo ? <Loader2 className="animate-spin" /> : <Upload />}
               </Button>
             </div>
+            <FieldError errors={errors.logoUrl ? [errors.logoUrl] : undefined} />
           </Field>
 
           <ColorField label="Primary color" value={values.primaryColor} onChange={(v) => setValue("primaryColor", v)} error={errors.primaryColor?.message} />

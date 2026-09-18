@@ -8,6 +8,9 @@ import { writeAuditLog } from "@/lib/audit";
 import { notifier } from "@/lib/notifications";
 import { examSchema, recordMarkSchema } from "@/lib/validators/exams";
 import { assertOwned } from "@/lib/rbac/ownership";
+import { assertTeaches } from "@/lib/academics/teaching";
+import { BusinessRuleError } from "@/lib/actions/errors";
+import { Role } from "@/generated/prisma/client";
 import { actionError, type ActionResult } from "@/lib/actions/types";
 
 export async function createExam(input: unknown): Promise<ActionResult<{ id: string }>> {
@@ -17,6 +20,7 @@ export async function createExam(input: unknown): Promise<ActionResult<{ id: str
     const data = examSchema.parse(input);
 
     await assertOwned(tenantId, { division: data.divisionId, subject: data.subjectId });
+    await assertTeaches(tenantId, session.user, data.divisionId, data.subjectId);
 
     const exam = await prisma.$transaction(async (tx) => {
       const created = await tx.exam.create({
@@ -56,7 +60,13 @@ export async function deleteExam(id: string): Promise<ActionResult> {
     const tenantId = await getTenantId();
 
     await prisma.$transaction(async (tx) => {
-      const exam = await tx.exam.findFirstOrThrow({ where: { id, tenantId } });
+      const exam = await tx.exam.findFirstOrThrow({ where: { id, tenantId }, include: { _count: { select: { marks: true } } } });
+      if (session.user.role !== Role.SUPER_ADMIN && exam.createdById !== session.user.id) {
+        throw new BusinessRuleError("You can only delete exams you scheduled.");
+      }
+      if (exam._count.marks > 0) {
+        throw new BusinessRuleError("Marks have been entered for this exam, so it can't be deleted.");
+      }
       await tx.exam.delete({ where: { id } });
       await writeAuditLog(tx, {
         tenantId,
@@ -85,11 +95,15 @@ export async function recordMark(input: unknown): Promise<ActionResult> {
     if (data.score > exam.maxMarks) {
       return { ok: false, error: `Score can't exceed ${exam.maxMarks}.` };
     }
+    await assertTeaches(tenantId, session.user, exam.divisionId, exam.subjectId);
 
     const student = await prisma.student.findFirstOrThrow({
       where: { id: data.studentId, tenantId },
       include: { user: true, guardians: { include: { guardian: { include: { user: true } } } } },
     });
+    if (student.divisionId !== exam.divisionId) {
+      return { ok: false, error: `${student.name} isn't in the division this exam was set for.` };
+    }
 
     await prisma.$transaction(async (tx) => {
       const mark = await tx.mark.upsert({

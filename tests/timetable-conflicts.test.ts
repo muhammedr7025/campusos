@@ -43,7 +43,7 @@ describe("timetable clashes", () => {
     const result = await createTimetableEntry(slot({ divisionId: secondDivision.id, subjectId: secondSubject.id }));
 
     expect(result.ok).toBe(false);
-    expect(await prisma.timetable.count()).toBe(1);
+    expect(await prisma.timetable.count({ where: { id: { not: f.timetableSlot.id } } })).toBe(1);
   });
 
   it("refuses to put a division in two classes at once", async () => {
@@ -57,7 +57,7 @@ describe("timetable clashes", () => {
 
     expect(result.ok).toBe(false);
     expect((result as { error: string }).error).toMatch(/division/i);
-    expect(await prisma.timetable.count()).toBe(1);
+    expect(await prisma.timetable.count({ where: { id: { not: f.timetableSlot.id } } })).toBe(1);
   });
 
   it("refuses to double-book a room", async () => {
@@ -77,7 +77,7 @@ describe("timetable clashes", () => {
     const result = await createTimetableEntry(slot({ subjectId: secondSubject.id, startTime: "10:00", endTime: "11:00" }));
 
     expect(result.ok).toBe(true);
-    expect(await prisma.timetable.count()).toBe(2);
+    expect(await prisma.timetable.count({ where: { id: { not: f.timetableSlot.id } } })).toBe(2);
   });
 
   it("allows the same time on a different day", async () => {

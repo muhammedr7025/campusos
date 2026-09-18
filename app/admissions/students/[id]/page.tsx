@@ -13,6 +13,8 @@ import { Badge } from "@/components/ui/badge";
 import { StatCard } from "@/components/layout/stat-card";
 import { KycChecklist } from "@/components/admissions/kyc-checklist";
 import { EditStudentDialog } from "@/components/admissions/edit-student-dialog";
+import { EditGuardianDialog } from "@/components/admissions/edit-guardian-dialog";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ReassignDivisionDialog } from "@/components/admissions/reassign-division-dialog";
 
 export default async function StudentDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -58,9 +60,15 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
 
       <Card>
         <CardHeader className="flex flex-row items-start justify-between">
-          <div>
-            <CardTitle className="text-xl">{student.name}</CardTitle>
-            <p className="text-muted-foreground text-sm">{student.enrollmentNumber} · {student.course.name} · {student.division?.name ?? "No division"}</p>
+          <div className="flex items-center gap-3">
+            <Avatar className="size-12">
+              {student.photoUrl && <AvatarImage src={student.photoUrl} alt="" className="object-cover" />}
+              <AvatarFallback>{student.name.charAt(0)}</AvatarFallback>
+            </Avatar>
+            <div>
+              <CardTitle className="text-xl">{student.name}</CardTitle>
+              <p className="text-muted-foreground text-sm">{student.enrollmentNumber} · {student.course.name} · {student.division?.name ?? "No division"}</p>
+            </div>
           </div>
           <Badge variant={student.status === "ACTIVE" ? "default" : "secondary"}>{student.status}</Badge>
         </CardHeader>
@@ -70,7 +78,21 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
           <div><span className="text-muted-foreground">Date of birth: </span>{student.dob ? student.dob.toLocaleDateString() : "—"}</div>
           <div><span className="text-muted-foreground">Address: </span>{student.address ?? "—"}</div>
           {student.guardians.map((sg) => (
-            <div key={sg.id}><span className="text-muted-foreground">Guardian: </span>{sg.guardian.name} ({sg.guardian.phone})</div>
+            <div key={sg.id} className="flex items-center gap-1">
+              <span className="text-muted-foreground">Guardian: </span>
+              <span>
+                {sg.guardian.name} ({sg.guardian.phone}){sg.guardian.relationship ? ` · ${sg.guardian.relationship}` : ""}
+              </span>
+              <EditGuardianDialog
+                guardian={{
+                  id: sg.guardian.id,
+                  name: sg.guardian.name,
+                  phone: sg.guardian.phone,
+                  email: sg.guardian.email,
+                  relationship: sg.guardian.relationship,
+                }}
+              />
+            </div>
           ))}
         </CardContent>
         <CardContent className="flex flex-wrap gap-2 pt-0">

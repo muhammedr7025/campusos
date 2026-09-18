@@ -12,6 +12,10 @@ let installmentIds: string[];
 beforeEach(async () => {
   await resetDb();
   f = await seedFixture();
+  // These installments are past due; with the fixture's late-fee rule in
+  // force the guard would (rightly) also accept the accrued late fee. The
+  // balance guard is what's under test here — late fees have their own file.
+  await prisma.feeStructure.update({ where: { id: f.feeStructure.id }, data: { lateFeeType: null, lateFeeValue: null } });
   const student = await createStudent(f);
   studentId = student.id;
   const plan = await prisma.feePlan.create({

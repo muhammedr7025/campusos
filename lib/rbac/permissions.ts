@@ -2,11 +2,11 @@ import { ROLE_VALUES } from "@/lib/constants/roles";
 import type { Role } from "@/generated/prisma/client";
 
 /**
- * Route groups gated by middleware (UX layer) — see middleware.ts.
+ * Route groups gated by middleware (UX layer) — see proxy.ts.
  * SUPER_ADMIN can reach every group; every other role is confined to its own.
  *
  * Built from ROLE_VALUES (plain strings), not the generated Prisma `Role`
- * enum object — this file is imported by middleware.ts, which runs in the
+ * enum object — this file is imported by proxy.ts, which runs in the
  * Edge Runtime and can't load the Prisma client's Node-dependent runtime.
  * `Role` is only used here as a type (erased at compile time).
  */

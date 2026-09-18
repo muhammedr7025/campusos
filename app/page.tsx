@@ -25,7 +25,9 @@ export default async function Home() {
     const [hostname, port] = host.split(":");
     const rootHostname = hostname.startsWith("www.") ? hostname.slice(4) : hostname;
     const portSuffix = port ? `:${port}` : "";
-    const tenants = await prisma.tenant.findMany({ orderBy: { name: "asc" } });
+    // A directory of every institute is a dev convenience, not something to
+    // show whoever types the bare domain into a browser in production.
+    const tenants = process.env.NODE_ENV === "production" ? [] : await prisma.tenant.findMany({ orderBy: { name: "asc" } });
 
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-6 p-8 text-center">
@@ -33,9 +35,15 @@ export default async function Home() {
         <div>
           <h1 className="text-xl font-semibold">This address isn&apos;t tied to an institute yet</h1>
           <p className="text-muted-foreground mt-1 max-w-md text-sm">
-            CampusOS is multi-tenant — pick an institute below (works on any host), or visit its
-            subdomain directly (e.g. <code className="bg-muted rounded px-1 py-0.5">acme.{rootHostname}{portSuffix}</code>
-            {" "}if your browser resolves *.localhost).
+            {tenants.length > 0 ? (
+              <>
+                CampusOS is multi-tenant — pick an institute below (works on any host), or visit its
+                subdomain directly (e.g. <code className="bg-muted rounded px-1 py-0.5">acme.{rootHostname}{portSuffix}</code>
+                {" "}if your browser resolves *.localhost).
+              </>
+            ) : (
+              <>Use the address your institute gave you — its own subdomain of {rootHostname} or its own domain.</>
+            )}
           </p>
         </div>
 

@@ -4,6 +4,7 @@ import { requireRole } from "@/lib/rbac/guard";
 import { getTenantId } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
 import { Role } from "@/generated/prisma/client";
+import { listTaughtClasses } from "@/lib/academics/teaching";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -16,26 +17,16 @@ export default async function TeacherExamsPage() {
   const session = await requireRole(Role.SUPER_ADMIN, Role.TEACHER);
   const tenantId = await getTenantId();
 
-  const myTimetable = await prisma.timetable.findMany({
-    where: { tenantId, teacherId: session.user.id },
-    include: { division: { select: { id: true, name: true, courseId: true } }, subject: { select: { id: true, name: true, courseId: true } } },
-  });
-
   const isAdmin = session.user.role === Role.SUPER_ADMIN;
-  const myDivisionIds = [...new Set(myTimetable.map((t) => t.divisionId))];
+  const taught = await listTaughtClasses(tenantId, session.user);
 
-  const [divisions, subjects, exams] = await Promise.all([
-    prisma.division.findMany({
-      where: { tenantId, ...(isAdmin ? {} : { id: { in: myDivisionIds } }) },
-      select: { id: true, name: true, courseId: true, course: { select: { name: true } } },
-      orderBy: { name: "asc" },
-    }),
-    prisma.subject.findMany({
-      where: { tenantId },
-      select: { id: true, name: true, courseId: true },
-    }),
+  const [exams] = await Promise.all([
     prisma.exam.findMany({
-      where: { tenantId, ...(isAdmin ? {} : { divisionId: { in: myDivisionIds } }) },
+      where: {
+        tenantId,
+        // A teacher with no classes sees no exams (an empty OR would match everything).
+        ...(isAdmin ? {} : taught.length > 0 ? { OR: taught.map((t) => ({ divisionId: t.divisionId, subjectId: t.subjectId })) } : { id: "__none__" }),
+      },
       include: {
         division: { select: { name: true, course: { select: { name: true } } } },
         subject: { select: { name: true } },
@@ -45,7 +36,10 @@ export default async function TeacherExamsPage() {
     }),
   ]);
 
-  const divisionOptions = divisions.map((d) => ({ id: d.id, name: `${d.course.name} · ${d.name}`, courseId: d.courseId }));
+  const divisionOptions = [
+    ...new Map(taught.map((t) => [t.divisionId, { id: t.divisionId, name: `${t.courseName} · ${t.divisionName}`, courseId: t.courseId }])).values(),
+  ];
+  const subjects = taught.map((t) => ({ id: t.subjectId, name: t.subjectName, courseId: t.courseId, divisionId: t.divisionId }));
 
   return (
     <div className="flex flex-col gap-6">
@@ -68,7 +62,9 @@ export default async function TeacherExamsPage() {
                     <p className="font-medium">{exam.name}</p>
                     <p className="text-muted-foreground text-sm">{exam.division.course.name} · {exam.division.name} · {exam.subject.name}</p>
                   </div>
-                  <DeleteExamButton id={exam.id} name={exam.name} />
+                  {(isAdmin || exam.createdById === session.user.id) && exam._count.marks === 0 && (
+                    <DeleteExamButton id={exam.id} name={exam.name} />
+                  )}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="secondary">{new Date(exam.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}</Badge>

@@ -31,15 +31,17 @@ export default async function PortalNotesPage() {
     getCurrentFeePlanForStudent(tenantId, activeStudentId),
   ]);
 
-  // Access lock is a student-specific policy — a parent can always view.
-  const locked = session.user.role === Role.STUDENT && !!feeDetail && feeDetail.balance > 0;
+  // Access lock is a student-specific policy — a parent can always view. It
+  // bites only when an installment is past due, not the moment a plan exists:
+  // a balance that isn't due yet is a schedule, not a debt.
+  const locked = session.user.role === Role.STUDENT && !!feeDetail && feeDetail.isOverdue;
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         crumb="Academics"
         title="Subject notes"
-        description={locked ? `Locked while ₹${feeDetail!.balance.toLocaleString("en-IN")} is outstanding.` : "All notes for your course, subject by subject."}
+        description={locked ? `Locked while an installment is overdue (₹${feeDetail!.balance.toLocaleString("en-IN")} outstanding).` : "All notes for your course, subject by subject."}
         actions={<ChildSwitcher students={students} activeStudentId={activeStudentId} />}
       />
 

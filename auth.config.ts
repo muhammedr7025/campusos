@@ -37,7 +37,10 @@ export const authConfig = {
       const rootDomain = (process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? "localhost:3000").split(":")[0];
       try {
         const target = new URL(url, baseUrl);
-        if (target.hostname === rootDomain || target.hostname.endsWith(`.${rootDomain}`)) {
+        // baseUrl is the host that made the request (trustHost), which covers
+        // an institute on its own custom domain.
+        const sameHost = target.hostname === new URL(baseUrl).hostname;
+        if (sameHost || target.hostname === rootDomain || target.hostname.endsWith(`.${rootDomain}`)) {
           return target.toString();
         }
       } catch {

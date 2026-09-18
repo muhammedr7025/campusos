@@ -6,12 +6,14 @@ import { getTenantId } from "@/lib/tenant";
 import { requirePermission } from "@/lib/rbac/guard";
 import { writeAuditLog } from "@/lib/audit";
 import { storage } from "@/lib/storage";
+import { IMAGE_TYPES, MAX_UPLOAD_BYTES, PDF_TYPE, uploadProblem } from "@/lib/storage/validate";
 import { subjectNoteSchema } from "@/lib/validators/notes";
 import { assertOwned } from "@/lib/rbac/ownership";
 import { actionError, type ActionResult } from "@/lib/actions/types";
+import { BusinessRuleError } from "@/lib/actions/errors";
+import { Role } from "@/generated/prisma/client";
 
-const MAX_NOTE_FILE_BYTES = 20 * 1024 * 1024;
-const ALLOWED_NOTE_TYPES = ["application/pdf", "image/png", "image/jpeg", "image/webp"];
+const NOTE_UPLOAD_RULE = { types: [PDF_TYPE, ...IMAGE_TYPES], maxBytes: MAX_UPLOAD_BYTES, describe: "a PDF or an image" };
 
 /**
  * Takes a FormData rather than a plain object because the note can carry a
@@ -43,14 +45,20 @@ export async function createSubjectNote(input: unknown): Promise<ActionResult<{ 
     const data = subjectNoteSchema.parse(fields);
 
     await assertOwned(tenantId, { course: data.courseId, subject: data.subjectId });
+    const subject = await prisma.subject.findFirst({ where: { id: data.subjectId, tenantId, courseId: data.courseId }, select: { id: true } });
+    if (!subject) return { ok: false, error: "That subject isn't part of the selected course." };
+    // A teacher publishes for subjects they teach somewhere in the course.
+    if (session.user.role !== Role.SUPER_ADMIN) {
+      const teaches = await prisma.timetable.findFirst({
+        where: { tenantId, teacherId: session.user.id, subjectId: data.subjectId },
+        select: { id: true },
+      });
+      if (!teaches) return { ok: false, error: "You can only publish notes for a subject you teach." };
+    }
 
     if (file) {
-      if (!ALLOWED_NOTE_TYPES.includes(file.type)) {
-        return { ok: false, error: "Attach a PDF or an image." };
-      }
-      if (file.size > MAX_NOTE_FILE_BYTES) {
-        return { ok: false, error: "That file is over the 20 MB limit." };
-      }
+      const problem = uploadProblem(file, NOTE_UPLOAD_RULE);
+      if (problem) return { ok: false, error: problem };
     }
 
     // Stored before the transaction so a slow upload doesn't hold a database
@@ -103,8 +111,11 @@ export async function deleteSubjectNote(id: string): Promise<ActionResult> {
     const session = await requirePermission("note:manage");
     const tenantId = await getTenantId();
 
-    await prisma.$transaction(async (tx) => {
+    const fileUrl = await prisma.$transaction(async (tx) => {
       const note = await tx.subjectNote.findFirstOrThrow({ where: { id, tenantId } });
+      if (session.user.role !== Role.SUPER_ADMIN && note.authorId !== session.user.id) {
+        throw new BusinessRuleError("You can only delete notes you published.");
+      }
       await tx.subjectNote.delete({ where: { id } });
       await writeAuditLog(tx, {
         tenantId,
@@ -114,7 +125,9 @@ export async function deleteSubjectNote(id: string): Promise<ActionResult> {
         entityId: id,
         diff: { title: note.title },
       });
+      return note.fileUrl;
     });
+    if (fileUrl) await storage.delete(fileUrl).catch(() => {});
 
     revalidatePath("/teacher/notes");
     revalidatePath("/portal/notes");

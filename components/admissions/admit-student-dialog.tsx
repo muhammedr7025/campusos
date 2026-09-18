@@ -21,6 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Field, FieldGroup, FieldLabel, FieldError, FieldSeparator } from "@/components/ui/field";
 import { admitStudentSchema, type AdmitStudentInput } from "@/lib/validators/admissions";
 import { admitStudent, type AdmitStudentResult } from "@/lib/actions/admissions";
+import { KycUploadFields, buildAdmissionFormData, type KycUploadState } from "@/components/admissions/kyc-upload-fields";
 
 type CourseOption = {
   id: string;
@@ -52,6 +53,7 @@ function CredentialRow({ label, email, password }: { label: string; email: strin
 export function AdmitStudentDialog({ courses }: { courses: CourseOption[] }) {
   const [open, setOpen] = useState(false);
   const [result, setResult] = useState<AdmitStudentResult | null>(null);
+  const [kycFiles, setKycFiles] = useState<KycUploadState>({});
   const router = useRouter();
 
   const {
@@ -85,7 +87,8 @@ export function AdmitStudentDialog({ courses }: { courses: CourseOption[] }) {
   );
 
   async function onSubmit(values: AdmitStudentInput) {
-    const res = await admitStudent(values);
+    // FormData so any documents handed over at the desk ride along with the fields.
+    const res = await admitStudent(buildAdmissionFormData(values, kycFiles));
     if (!res.ok) {
       toast.error(res.error);
       return;
@@ -93,12 +96,14 @@ export function AdmitStudentDialog({ courses }: { courses: CourseOption[] }) {
     toast.success(`${values.name} admitted as ${res.data.enrollmentNumber}.`);
     setResult(res.data);
     reset();
+    setKycFiles({});
     router.refresh();
   }
 
   function close() {
     setOpen(false);
     setResult(null);
+    setKycFiles({});
   }
 
   return (
@@ -128,6 +133,9 @@ export function AdmitStudentDialog({ courses }: { courses: CourseOption[] }) {
                   The guardian already had a portal account — their existing login still works.
                 </p>
               )}
+              {result.notes.map((note) => (
+                <p key={note} className="text-muted-foreground text-xs">{note}</p>
+              ))}
             </div>
             <DialogFooter>
               <Button onClick={close}>Done</Button>
@@ -139,7 +147,8 @@ export function AdmitStudentDialog({ courses }: { courses: CourseOption[] }) {
               <DialogTitle>Admit a student</DialogTitle>
               <DialogDescription>
                 For a walk-in with no enquiry on record. A fee plan, KYC checklist and portal logins are created
-                automatically — no lead record is involved.
+                automatically — no lead record is involved. Documents handed over now are filed against the checklist;
+                anything missing can be uploaded later from the student&apos;s profile.
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmit(onSubmit)} noValidate>
@@ -243,6 +252,22 @@ export function AdmitStudentDialog({ courses }: { courses: CourseOption[] }) {
                   <FieldLabel htmlFor="guardianRelationship">Relationship</FieldLabel>
                   <Input id="guardianRelationship" placeholder="Mother / Father / Guardian" {...register("guardianRelationship")} />
                 </Field>
+
+                <FieldSeparator>KYC documents (optional)</FieldSeparator>
+
+                <KycUploadFields
+                  files={kycFiles}
+                  disabled={isSubmitting}
+                  onChange={(docType, file) =>
+                    setKycFiles((prev) => {
+                      const next = { ...prev };
+                      if (file) next[docType] = file;
+                      else delete next[docType];
+                      return next;
+                    })
+                  }
+                />
+                <p className="text-muted-foreground text-xs">PDF or image, up to 20 MB each.</p>
               </FieldGroup>
               <DialogFooter className="mt-6">
                 <Button type="submit" disabled={isSubmitting}>

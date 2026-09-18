@@ -1,8 +1,8 @@
 import "server-only";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, unlink, writeFile } from "node:fs/promises";
 import { join, extname } from "node:path";
 import { randomUUID } from "node:crypto";
-import { STORAGE_ROOT, storageUrl } from "@/lib/storage/paths";
+import { STORAGE_ROOT, resolveStoredPath, storageUrl, STORAGE_URL_PREFIX } from "@/lib/storage/paths";
 import type { StorageProvider, StorageSaveInput, StorageSaveResult } from "@/lib/storage/types";
 
 function sanitizeSegment(segment: string): string {
@@ -23,5 +23,16 @@ export class LocalStorageProvider implements StorageProvider {
     await writeFile(join(dir, storedName), buffer);
 
     return { url: storageUrl([tenantDir, categoryDir, storedName]) };
+  }
+
+  async delete(url: string): Promise<void> {
+    if (!url.startsWith(STORAGE_URL_PREFIX)) return;
+    const resolved = resolveStoredPath(url.slice(STORAGE_URL_PREFIX.length).split("/"));
+    if (!resolved) return;
+    try {
+      await unlink(resolved);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
   }
 }

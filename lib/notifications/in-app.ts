@@ -5,16 +5,23 @@ import type { NotificationPayload, NotificationProvider } from "@/lib/notificati
 
 export class InAppNotificationProvider implements NotificationProvider {
   async send(tenantId: string, recipientUserId: string, type: NotificationType, payload: NotificationPayload) {
-    await prisma.notification.create({
-      data: {
-        tenantId,
-        recipientId: recipientUserId,
-        type,
-        title: payload.title,
-        body: payload.body,
-        relatedEntityType: payload.relatedEntityType,
-        relatedEntityId: payload.relatedEntityId,
-      },
+    // skipDuplicates turns a repeated dedupe key into a no-op at the database,
+    // so concurrent reminder runs can't both deliver the same one.
+    const { count } = await prisma.notification.createMany({
+      data: [
+        {
+          tenantId,
+          recipientId: recipientUserId,
+          type,
+          title: payload.title,
+          body: payload.body,
+          relatedEntityType: payload.relatedEntityType,
+          relatedEntityId: payload.relatedEntityId,
+          dedupeKey: payload.dedupeKey ?? null,
+        },
+      ],
+      skipDuplicates: true,
     });
+    return count > 0;
   }
 }

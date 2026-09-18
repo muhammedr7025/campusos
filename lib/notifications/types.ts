@@ -5,6 +5,8 @@ export type NotificationPayload = {
   body: string;
   relatedEntityType?: string;
   relatedEntityId?: string;
+  /** When set, the notification is sent at most once per recipient per key. */
+  dedupeKey?: string;
 };
 
 /**
@@ -15,5 +17,6 @@ export type NotificationPayload = {
  * registering it in lib/notifications/index.ts — call sites never change.
  */
 export interface NotificationProvider {
-  send(tenantId: string, recipientUserId: string, type: NotificationType, payload: NotificationPayload): Promise<void>;
+  /** Resolves true if the notification was delivered, false if its dedupe key had already been used. */
+  send(tenantId: string, recipientUserId: string, type: NotificationType, payload: NotificationPayload): Promise<boolean>;
 }

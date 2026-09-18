@@ -13,6 +13,7 @@ import { Field, FieldGroup, FieldLabel, FieldError, FieldSeparator } from "@/com
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { convertLeadSchema, type ConvertLeadInput } from "@/lib/validators/admissions";
 import { convertLead, type ConvertLeadResult } from "@/lib/actions/admissions";
+import { KycUploadFields, buildAdmissionFormData, type KycUploadState } from "@/components/admissions/kyc-upload-fields";
 
 type CourseOption = { id: string; name: string; divisions: { id: string; name: string; capacity: number | null; studentCount: number }[] };
 
@@ -47,6 +48,7 @@ export function ConvertLeadForm({
   courses: CourseOption[];
 }) {
   const [result, setResult] = useState<ConvertLeadResult | null>(null);
+  const [kycFiles, setKycFiles] = useState<KycUploadState>({});
   const {
     register,
     handleSubmit,
@@ -75,7 +77,8 @@ export function ConvertLeadForm({
   );
 
   async function onSubmit(values: ConvertLeadInput) {
-    const res = await convertLead(values);
+    // FormData so the documents collected at the desk ride along with the fields.
+    const res = await convertLead(buildAdmissionFormData(values, kycFiles));
     if (!res.ok) {
       toast.error(res.error);
       return;
@@ -96,9 +99,16 @@ export function ConvertLeadForm({
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           <CredentialRow label="Student portal" email={result.studentLogin.email} password={result.studentLogin.password} />
-          {result.guardianLogin && (
+          {result.guardianLogin ? (
             <CredentialRow label="Parent portal" email={result.guardianLogin.email} password={result.guardianLogin.password} />
+          ) : (
+            <p className="text-muted-foreground text-sm">
+              The guardian already had a portal account — their existing login still works.
+            </p>
           )}
+          {result.notes.map((note) => (
+            <p key={note} className="text-muted-foreground text-xs">{note}</p>
+          ))}
           <Button asChild className="mt-2 w-fit">
             <Link href={`/admissions/students/${result.studentId}`}>Go to student profile</Link>
           </Button>
@@ -195,6 +205,24 @@ export function ConvertLeadForm({
         </div>
         <p className="text-muted-foreground text-xs">
           If a guardian with this phone number already exists, the new student links to their existing account instead of creating a duplicate.
+        </p>
+
+        <FieldSeparator>KYC documents (optional)</FieldSeparator>
+
+        <KycUploadFields
+          files={kycFiles}
+          disabled={isSubmitting}
+          onChange={(docType, file) =>
+            setKycFiles((prev) => {
+              const next = { ...prev };
+              if (file) next[docType] = file;
+              else delete next[docType];
+              return next;
+            })
+          }
+        />
+        <p className="text-muted-foreground text-xs">
+          PDF or image, up to 20 MB each. Anything not handed over now stays pending on the KYC tracker.
         </p>
       </FieldGroup>
 

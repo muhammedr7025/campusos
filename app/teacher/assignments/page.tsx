@@ -4,6 +4,7 @@ import { requireRole } from "@/lib/rbac/guard";
 import { getTenantId } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
 import { Role } from "@/generated/prisma/client";
+import { listTaughtClasses } from "@/lib/academics/teaching";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/layout/empty-state";
@@ -14,15 +15,17 @@ export default async function TeacherAssignmentsPage() {
   const session = await requireRole(Role.SUPER_ADMIN, Role.TEACHER);
   const tenantId = await getTenantId();
 
-  const [assignments, divisions, subjects] = await Promise.all([
+  const [assignments, taught] = await Promise.all([
     prisma.assignment.findMany({
       where: { tenantId, ...(session.user.role === Role.SUPER_ADMIN ? {} : { teacherId: session.user.id }) },
       include: { division: { include: { course: true } }, subject: true, submissions: { select: { status: true } } },
       orderBy: { dueDate: "desc" },
     }),
-    prisma.division.findMany({ where: { tenantId }, select: { id: true, name: true, courseId: true } }),
-    prisma.subject.findMany({ where: { tenantId }, select: { id: true, name: true, courseId: true } }),
+    // A teacher posts to their own classes; the picker offers nothing else.
+    listTaughtClasses(tenantId, session.user),
   ]);
+  const divisions = [...new Map(taught.map((t) => [t.divisionId, { id: t.divisionId, name: `${t.courseName} · ${t.divisionName}`, courseId: t.courseId }])).values()];
+  const subjects = [...new Map(taught.map((t) => [`${t.divisionId}:${t.subjectId}`, { id: t.subjectId, name: t.subjectName, courseId: t.courseId, divisionId: t.divisionId }])).values()];
 
   return (
     <div className="flex flex-col gap-6">

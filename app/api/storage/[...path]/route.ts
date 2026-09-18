@@ -31,11 +31,15 @@ export async function GET(_req: Request, { params }: { params: Promise<{ path: s
 
   try {
     const buffer = await readFile(resolved);
+    const contentType = contentTypeFor(resolved);
+    // An SVG rendered inline runs its scripts on this origin, so it downloads
+    // instead; everything else opens in the browser's own viewer.
+    const inline = contentType !== "image/svg+xml";
     return new NextResponse(new Uint8Array(buffer), {
       headers: {
-        "Content-Type": contentTypeFor(resolved),
-        // Inline so a PDF opens in the browser's viewer instead of downloading.
-        "Content-Disposition": "inline",
+        "Content-Type": contentType,
+        "Content-Disposition": inline ? "inline" : "attachment",
+        "X-Content-Type-Options": "nosniff",
         "Cache-Control": isPublic ? "public, max-age=3600" : "private, max-age=3600",
       },
     });

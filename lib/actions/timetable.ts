@@ -53,7 +53,7 @@ export async function createTimetableEntry(input: unknown): Promise<ActionResult
     if (clash) return { ok: false, error: clash };
 
     const entry = await prisma.$transaction(async (tx) => {
-      const created = await tx.timetable.create({ data: { tenantId, ...data } });
+      const created = await tx.timetable.create({ data: { tenantId, ...data, room: data.room?.trim() || null } });
       await writeAuditLog(tx, {
         tenantId,
         actorId: session.user.id,
@@ -86,7 +86,7 @@ export async function updateTimetableEntry(id: string, input: unknown): Promise<
 
     await prisma.$transaction(async (tx) => {
       const before = await tx.timetable.findFirstOrThrow({ where: { id, tenantId } });
-      await tx.timetable.update({ where: { id }, data });
+      await tx.timetable.update({ where: { id }, data: { ...data, room: data.room?.trim() || null } });
       await writeAuditLog(tx, {
         tenantId,
         actorId: session.user.id,

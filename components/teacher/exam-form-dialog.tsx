@@ -24,7 +24,8 @@ import { examSchema, type ExamInput } from "@/lib/validators/exams";
 import { createExam } from "@/lib/actions/exams";
 
 type DivisionOption = { id: string; name: string; courseId: string };
-type SubjectOption = { id: string; name: string; courseId: string };
+/** `divisionId` narrows a subject to one class a teacher actually takes. */
+type SubjectOption = { id: string; name: string; courseId: string; divisionId?: string };
 
 export function ExamFormDialog({ divisions, subjects }: { divisions: DivisionOption[]; subjects: SubjectOption[] }) {
   const [open, setOpen] = useState(false);
@@ -43,7 +44,11 @@ export function ExamFormDialog({ divisions, subjects }: { divisions: DivisionOpt
 
   const selectedDivisionId = watch("divisionId");
   const courseId = divisions.find((d) => d.id === selectedDivisionId)?.courseId;
-  const availableSubjects = useMemo(() => subjects.filter((s) => s.courseId === courseId), [subjects, courseId]);
+  const availableSubjects = useMemo(
+    () =>
+      subjects.filter((s) => s.courseId === courseId && (!s.divisionId || s.divisionId === selectedDivisionId)),
+    [subjects, courseId, selectedDivisionId],
+  );
 
   async function onSubmit(values: ExamInput) {
     const result = await createExam(values);

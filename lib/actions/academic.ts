@@ -7,6 +7,7 @@ import { requirePermission } from "@/lib/rbac/guard";
 import { writeAuditLog } from "@/lib/audit";
 import { batchSchema, courseSchema, divisionSchema, subjectSchema } from "@/lib/validators/academic";
 import { actionError, type ActionResult } from "@/lib/actions/types";
+import { BusinessRuleError } from "@/lib/actions/errors";
 
 export async function createBatch(input: unknown): Promise<ActionResult<{ id: string }>> {
   try {
@@ -183,11 +184,14 @@ export async function deleteCourse(courseId: string): Promise<ActionResult> {
 
     const course = await prisma.course.findFirstOrThrow({
       where: { id: courseId, tenantId },
-      include: { _count: { select: { students: true, divisions: true } } },
+      include: { _count: { select: { students: true, divisions: true, leads: true, feeStructures: true } } },
     });
 
     if (course._count.students > 0 || course._count.divisions > 0) {
       return { ok: false, error: "Can't delete a course with active divisions or enrolled students." };
+    }
+    if (course._count.leads > 0 || course._count.feeStructures > 0) {
+      return { ok: false, error: "Enquiries or fee structures still point at this course. Move or remove them first." };
     }
 
     await prisma.$transaction(async (tx) => {
@@ -246,7 +250,18 @@ export async function updateDivision(divisionId: string, input: unknown): Promis
     await prisma.course.findFirstOrThrow({ where: { id: data.courseId, tenantId } });
 
     await prisma.$transaction(async (tx) => {
-      const before = await tx.division.findFirstOrThrow({ where: { id: divisionId, tenantId } });
+      const before = await tx.division.findFirstOrThrow({
+        where: { id: divisionId, tenantId },
+        include: { _count: { select: { students: true } } },
+      });
+      // Students carry their own courseId; moving their division to another
+      // course would leave them enrolled in a course their division isn't in.
+      if (before.courseId !== data.courseId && before._count.students > 0) {
+        throw new BusinessRuleError("A division with students can't be moved to another course. Reassign the students first.");
+      }
+      if (data.capacity != null && data.capacity < before._count.students) {
+        throw new BusinessRuleError(`Capacity can't be below the ${before._count.students} students already in this division.`);
+      }
       await tx.division.update({ where: { id: divisionId }, data });
       await writeAuditLog(tx, {
         tenantId,
@@ -273,11 +288,25 @@ export async function deleteDivision(divisionId: string): Promise<ActionResult> 
 
     const division = await prisma.division.findFirstOrThrow({
       where: { id: divisionId, tenantId },
-      include: { _count: { select: { students: true } } },
+      include: {
+        _count: { select: { students: true, enrollments: true, timetables: true, assignments: true, exams: true, attendances: true } },
+      },
     });
 
     if (division._count.students > 0) {
       return { ok: false, error: "Can't delete a division with enrolled students." };
+    }
+    // Cascades would silently take the timetable, assignments and exams with
+    // it; attendance and enrollment history would block with a raw FK error.
+    const inUse = [
+      division._count.enrollments && "enrollment history",
+      division._count.attendances && "attendance records",
+      division._count.timetables && "timetable slots",
+      division._count.assignments && "assignments",
+      division._count.exams && "exams",
+    ].filter(Boolean);
+    if (inUse.length > 0) {
+      return { ok: false, error: `Can't delete a division that still has ${inUse.join(", ")}. Remove those first.` };
     }
 
     await prisma.$transaction(async (tx) => {
@@ -360,11 +389,12 @@ export async function deleteSubject(subjectId: string): Promise<ActionResult> {
 
     const subject = await prisma.subject.findFirstOrThrow({
       where: { id: subjectId, tenantId },
-      include: { _count: { select: { timetables: true, attendances: true, assignments: true } } },
+      include: { _count: { select: { timetables: true, attendances: true, assignments: true, exams: true, notes: true } } },
     });
 
-    if (subject._count.timetables > 0 || subject._count.attendances > 0 || subject._count.assignments > 0) {
-      return { ok: false, error: "Can't delete a subject already used in a timetable, attendance record, or assignment." };
+    const c = subject._count;
+    if (c.timetables > 0 || c.attendances > 0 || c.assignments > 0 || c.exams > 0 || c.notes > 0) {
+      return { ok: false, error: "Can't delete a subject already used in a timetable, attendance record, assignment, exam or published notes." };
     }
 
     await prisma.$transaction(async (tx) => {

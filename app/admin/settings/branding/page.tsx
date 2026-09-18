@@ -2,6 +2,7 @@ import { requireRole } from "@/lib/rbac/guard";
 import { getCurrentTenant } from "@/lib/tenant";
 import { Role } from "@/generated/prisma/client";
 import { BrandingForm } from "@/components/admin/branding-form";
+import { AdmissionSettingsForm } from "@/components/admin/admission-settings-form";
 import { PageHeader } from "@/components/layout/page-header";
 
 export default async function BrandingSettingsPage() {
@@ -11,7 +12,7 @@ export default async function BrandingSettingsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader crumb="Governance" title="Branding" description="White-label this workspace — no code changes needed, just save." />
+      <PageHeader crumb="Governance" title="Branding" description="White-label this workspace and set admission rules — no code changes needed, just save." />
       <BrandingForm
         initial={{
           name: tenant.name,
@@ -22,6 +23,7 @@ export default async function BrandingSettingsPage() {
           accentColor: tenant.accentColor,
         }}
       />
+      <AdmissionSettingsForm initialRequired={tenant.requiredKycDocs} />
     </div>
   );
 }

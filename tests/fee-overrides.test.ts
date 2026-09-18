@@ -32,6 +32,9 @@ async function planFor(studentId: string, total = 60000) {
 beforeEach(async () => {
   await resetDb();
   f = await seedFixture();
+  // Past-due installments would accrue the fixture's late fee; these tests are
+  // about balances across superseded plans, so the rule is switched off.
+  await prisma.feeStructure.update({ where: { id: f.feeStructure.id }, data: { lateFeeType: null, lateFeeValue: null } });
   const student = await createStudent(f);
   studentId = student.id;
   await planFor(studentId);

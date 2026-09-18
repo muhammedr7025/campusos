@@ -5,9 +5,9 @@ import Link from "next/link";
 import { type ColumnDef } from "@tanstack/react-table";
 import { Receipt } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { DataTable } from "@/components/data-table/data-table";
-import { ReceiptDialog } from "@/components/finance/receipt-dialog";
 import { CorrectPaymentDialog } from "@/components/finance/correct-payment-dialog";
 
 export type LedgerRow = {
@@ -34,19 +34,14 @@ function Amount({ amount }: { amount: number }) {
   );
 }
 
-function RowActions({ row, tenantName }: { row: LedgerRow; tenantName: string }) {
+function RowActions({ row }: { row: LedgerRow }) {
   return (
     <div className="flex items-center justify-end gap-1">
-      <ReceiptDialog
-        tenantName={tenantName}
-        studentName={row.studentName}
-        enrollmentNumber={row.enrollmentNumber}
-        amount={row.amount}
-        mode={row.mode}
-        paidAt={row.paidAt}
-        collectedBy={row.collectedBy}
-        receiptNo={row.receiptNumber}
-      />
+      <Button asChild variant="ghost" size="icon" aria-label={`Open receipt ${row.receiptNumber}`}>
+        <Link href={`/receipts/${row.id}`} target="_blank" rel="noreferrer">
+          <Receipt className="size-4" />
+        </Link>
+      </Button>
       {!row.isCorrection && !row.isCorrected && (
         <CorrectPaymentDialog paymentId={row.id} currentAmount={row.amount} />
       )}
@@ -54,7 +49,7 @@ function RowActions({ row, tenantName }: { row: LedgerRow; tenantName: string })
   );
 }
 
-export function PaymentsLedgerTable({ rows, tenantName }: { rows: LedgerRow[]; tenantName: string }) {
+export function PaymentsLedgerTable({ rows }: { rows: LedgerRow[] }) {
   const columns = useMemo<ColumnDef<LedgerRow>[]>(
     () => [
       {
@@ -62,7 +57,9 @@ export function PaymentsLedgerTable({ rows, tenantName }: { rows: LedgerRow[]; t
         header: "Receipt",
         cell: ({ row }) => (
           <div>
-            <p className="font-medium tabular-nums">{row.original.receiptNumber}</p>
+            <Link href={`/receipts/${row.original.id}`} target="_blank" rel="noreferrer" className="font-medium tabular-nums hover:underline">
+              {row.original.receiptNumber}
+            </Link>
             {row.original.isCorrection ? (
               <Badge variant="warning">Reversal</Badge>
             ) : row.original.isCorrected ? (
@@ -94,10 +91,10 @@ export function PaymentsLedgerTable({ rows, tenantName }: { rows: LedgerRow[]; t
       {
         id: "actions",
         header: "",
-        cell: ({ row }) => <RowActions row={row.original} tenantName={tenantName} />,
+        cell: ({ row }) => <RowActions row={row.original} />,
       },
     ],
-    [tenantName],
+    [],
   );
 
   return (
@@ -133,7 +130,7 @@ export function PaymentsLedgerTable({ rows, tenantName }: { rows: LedgerRow[]; t
               ) : (
                 <span />
               )}
-              <RowActions row={row} tenantName={tenantName} />
+              <RowActions row={row} />
             </div>
           </CardContent>
         </Card>

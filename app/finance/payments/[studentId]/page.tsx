@@ -1,29 +1,28 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Receipt } from "lucide-react";
 import { requireRole } from "@/lib/rbac/guard";
-import { getTenantId, getCurrentTenant } from "@/lib/tenant";
+import { getTenantId } from "@/lib/tenant";
 import { Role } from "@/generated/prisma/client";
 import { getCurrentFeePlanForStudent } from "@/lib/fees/balance";
+import { receiptLabel } from "@/lib/fees/receipt";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { LogPaymentDialog } from "@/components/finance/log-payment-dialog";
 import { CorrectPaymentDialog } from "@/components/finance/correct-payment-dialog";
-import { ReceiptDialog } from "@/components/finance/receipt-dialog";
 import { FeePlanOverrideDialog } from "@/components/finance/fee-plan-override-dialog";
 import { EmptyState } from "@/components/layout/empty-state";
-import { Receipt } from "lucide-react";
 
 export default async function StudentFeePlanPage({ params }: { params: Promise<{ studentId: string }> }) {
   await requireRole(Role.SUPER_ADMIN, Role.FINANCE);
   const tenantId = await getTenantId();
-  const tenant = await getCurrentTenant();
   const { studentId } = await params;
 
   const detail = await getCurrentFeePlanForStudent(tenantId, studentId);
   if (!detail) notFound();
-  const { plan, total, paid, balance } = detail;
+  const { plan, total, paid, balance, lateFee, totalDue, isOverdue } = detail;
 
   const installmentPaid = new Map<string, number>();
   for (const payment of plan.payments) {
@@ -44,11 +43,13 @@ export default async function StudentFeePlanPage({ params }: { params: Promise<{
             <p className="text-muted-foreground text-sm">{plan.student.enrollmentNumber}</p>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant={balance === 0 ? "default" : "secondary"}>{balance === 0 ? "Paid" : "Balance due"}</Badge>
+            <Badge variant={balance === 0 ? "default" : isOverdue ? "destructive" : "secondary"}>
+              {balance === 0 ? "Paid" : isOverdue ? "Overdue" : "Balance due"}
+            </Badge>
             <FeePlanOverrideDialog studentId={studentId} />
           </div>
         </CardHeader>
-        <CardContent className="grid grid-cols-3 gap-4 text-center">
+        <CardContent className={`grid gap-4 text-center ${lateFee > 0 ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3"}`}>
           <div>
             <p className="text-muted-foreground text-xs">Total</p>
             <p className="text-lg font-semibold">₹{total.toLocaleString("en-IN")}</p>
@@ -61,12 +62,25 @@ export default async function StudentFeePlanPage({ params }: { params: Promise<{
             <p className="text-muted-foreground text-xs">Balance</p>
             <p className="text-lg font-semibold">₹{balance.toLocaleString("en-IN")}</p>
           </div>
+          {lateFee > 0 && (
+            <div>
+              <p className="text-muted-foreground text-xs">Late fee</p>
+              <p className="text-destructive text-lg font-semibold">₹{lateFee.toLocaleString("en-IN")}</p>
+            </div>
+          )}
         </CardContent>
-        {plan.overrideReason && (
-          <CardContent className="pt-0">
-            <p className="text-muted-foreground text-xs">
-              Custom plan — {plan.overrideReason} (approved by {plan.approvedBy?.name})
-            </p>
+        {(plan.overrideReason || lateFee > 0) && (
+          <CardContent className="flex flex-col gap-1 pt-0">
+            {plan.overrideReason && (
+              <p className="text-muted-foreground text-xs">
+                Custom plan — {plan.overrideReason} (approved by {plan.approvedBy?.name})
+              </p>
+            )}
+            {lateFee > 0 && (
+              <p className="text-muted-foreground text-xs">
+                Settling today: ₹{totalDue.toLocaleString("en-IN")} including the late fee under this structure&apos;s rule.
+              </p>
+            )}
           </CardContent>
         )}
       </Card>
@@ -74,11 +88,13 @@ export default async function StudentFeePlanPage({ params }: { params: Promise<{
       <div>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-lg font-semibold">Installments</h2>
-          <LogPaymentDialog
-            studentId={studentId}
-            feePlanId={plan.id}
-            installments={plan.installments.map((i) => ({ id: i.id, label: i.label, amount: Number(i.amount) }))}
-          />
+          {totalDue > 0 && (
+            <LogPaymentDialog
+              studentId={studentId}
+              feePlanId={plan.id}
+              installments={plan.installments.map((i) => ({ id: i.id, label: i.label, amount: Number(i.amount) }))}
+            />
+          )}
         </div>
         <div className="flex flex-col gap-2">
           {plan.installments.map((installment) => {
@@ -110,10 +126,11 @@ export default async function StudentFeePlanPage({ params }: { params: Promise<{
           <div className="flex flex-col gap-2">
             {plan.payments.map((payment) => (
               <Card key={payment.id}>
-                <CardContent className="flex items-center justify-between p-4">
-                  <div>
+                <CardContent className="flex items-center justify-between gap-3 p-4">
+                  <div className="min-w-0">
                     <p className="font-medium">
                       {Number(payment.amount) < 0 ? "− " : ""}₹{Math.abs(Number(payment.amount)).toLocaleString("en-IN")}
+                      <span className="text-muted-foreground ml-2 font-mono text-xs">{receiptLabel(payment)}</span>
                       {payment.correctionOfId && <span className="text-muted-foreground text-xs"> (correction)</span>}
                     </p>
                     <p className="text-muted-foreground text-xs">
@@ -122,20 +139,13 @@ export default async function StudentFeePlanPage({ params }: { params: Promise<{
                     {payment.note && <p className="text-muted-foreground text-xs">{payment.note}</p>}
                   </div>
                   <div className="flex items-center gap-1">
-                    {!payment.correctionOfId && (
-                      <>
-                        <ReceiptDialog
-                          tenantName={tenant?.name ?? ""}
-                          studentName={plan.student.name}
-                          enrollmentNumber={plan.student.enrollmentNumber}
-                          amount={Number(payment.amount)}
-                          mode={payment.mode}
-                          paidAt={payment.paidAt.toLocaleDateString()}
-                          collectedBy={payment.collectedBy.name}
-                          receiptNo={payment.id.slice(-8).toUpperCase()}
-                        />
-                        <CorrectPaymentDialog paymentId={payment.id} currentAmount={Number(payment.amount)} />
-                      </>
+                    <Button asChild variant="outline" size="sm">
+                      <Link href={`/receipts/${payment.id}`} target="_blank" rel="noreferrer">
+                        <Receipt /> Receipt
+                      </Link>
+                    </Button>
+                    {!payment.correctionOfId && payment.corrections.length === 0 && (
+                      <CorrectPaymentDialog paymentId={payment.id} currentAmount={Number(payment.amount)} />
                     )}
                   </div>
                 </CardContent>

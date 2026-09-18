@@ -159,13 +159,16 @@ async function seedTenant(config: {
     },
   });
 
+  // Keyed on the lead it came from, so re-seeding an existing database finds
+  // the same student whatever number it was issued under; a fresh seed gets
+  // the format the app issues (YYYY-NNNN).
   const student = await prisma.student.upsert({
-    where: { tenantId_enrollmentNumber: { tenantId: tenant.id, enrollmentNumber: `${config.subdomain.toUpperCase()}-2025-0001` } },
+    where: { convertedFromLeadId: lead.id },
     update: {},
     create: {
       tenantId: tenant.id,
       convertedFromLeadId: lead.id,
-      enrollmentNumber: `${config.subdomain.toUpperCase()}-2025-0001`,
+      enrollmentNumber: "2025-0001",
       name: lead.name,
       phone: lead.phone,
       courseId: course.id,

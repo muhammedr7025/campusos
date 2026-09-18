@@ -12,9 +12,11 @@ import path from "node:path";
  */
 export const STORAGE_ROOT = path.resolve(process.env.STORAGE_LOCAL_DIR ?? "./storage");
 
+export const STORAGE_URL_PREFIX = "/api/storage/";
+
 /** Public URL for a stored object. Reads go through the authenticated route. */
 export function storageUrl(segments: string[]): string {
-  return `/api/storage/${segments.join("/")}`;
+  return `${STORAGE_URL_PREFIX}${segments.join("/")}`;
 }
 
 /**

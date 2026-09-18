@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, Loader2 } from "lucide-react";
+import { Plus, Loader2, CheckCircle2, Printer, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,12 +19,29 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Field, FieldGroup, FieldLabel, FieldError } from "@/components/ui/field";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Field,
+  FieldGroup,
+  FieldLabel,
+  FieldError,
+} from "@/components/ui/field";
 import { paymentSchema, type PaymentInput } from "@/lib/validators/finance";
-import { logPayment } from "@/lib/actions/finance";
+import { logPayment, type LogPaymentResult } from "@/lib/actions/finance";
 
-const MODE_OPTIONS = ["CASH", "UPI", "BANK_TRANSFER", "CHEQUE", "OTHER"] as const;
+const MODE_OPTIONS = [
+  "CASH",
+  "UPI",
+  "BANK_TRANSFER",
+  "CHEQUE",
+  "OTHER",
+] as const;
 
 export type PayableStudent = {
   id: string;
@@ -51,6 +69,9 @@ export function LogPaymentDialog({
   students?: PayableStudent[];
 }) {
   const [open, setOpen] = useState(false);
+  const [logged, setLogged] = useState<
+    (LogPaymentResult & { amount: number }) | null
+  >(null);
   const router = useRouter();
 
   const pickable = students ?? [];
@@ -82,8 +103,12 @@ export function LogPaymentDialog({
   });
 
   const selectedStudentId = watch("studentId");
-  const selected = isPicker ? pickable.find((s) => s.id === selectedStudentId) : undefined;
-  const activeInstallments = isPicker ? (selected?.installments ?? []) : fixedInstallments;
+  const selected = isPicker
+    ? pickable.find((s) => s.id === selectedStudentId)
+    : undefined;
+  const activeInstallments = isPicker
+    ? (selected?.installments ?? [])
+    : fixedInstallments;
 
   function onStudentChange(nextId: string) {
     const student = pickable.find((s) => s.id === nextId);
@@ -91,7 +116,13 @@ export function LogPaymentDialog({
     setValue("studentId", nextId);
     setValue("feePlanId", student.feePlanId);
     setValue("installmentId", student.installments[0]?.id);
-    setValue("amount", Math.min(student.installments[0]?.amount ?? student.balance, student.balance));
+    setValue(
+      "amount",
+      Math.min(
+        student.installments[0]?.amount ?? student.balance,
+        student.balance,
+      ),
+    );
   }
 
   async function onSubmit(values: PaymentInput) {
@@ -100,110 +131,185 @@ export function LogPaymentDialog({
       toast.error(result.error);
       return;
     }
-    toast.success(`Payment of ₹${values.amount.toLocaleString("en-IN")} logged.`);
+    toast.success(
+      `Payment of ₹${values.amount.toLocaleString("en-IN")} logged — receipt ${result.data.receiptNumber}.`,
+    );
+    // Stay open on a receipt view: the desk hands the printout over right now.
+    setLogged({ ...result.data, amount: values.amount });
     reset();
-    setOpen(false);
     router.refresh();
   }
 
+  function close() {
+    setOpen(false);
+    setLogged(null);
+  }
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => (next ? setOpen(true) : close())}
+    >
       <DialogTrigger asChild>
         <Button>
           <Plus /> Log payment
         </Button>
       </DialogTrigger>
       <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Log payment</DialogTitle>
-          <DialogDescription>Recorded with your name as collector — this becomes part of the audit trail.</DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} noValidate>
-          <FieldGroup>
-            {isPicker && (
-              <Field data-invalid={!!errors.studentId}>
-                <FieldLabel htmlFor="studentId">Student</FieldLabel>
-                <Select value={selectedStudentId} onValueChange={onStudentChange}>
-                  <SelectTrigger id="studentId" className="w-full">
-                    <SelectValue placeholder="Select a student" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {pickable.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.name} · ₹{s.balance.toLocaleString("en-IN")} due
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FieldError errors={errors.studentId ? [errors.studentId] : undefined} />
-              </Field>
-            )}
-            {activeInstallments.length > 0 && (
-              <Field>
-                <FieldLabel htmlFor="installmentId">Installment</FieldLabel>
-                <Controller
-                  control={control}
-                  name="installmentId"
-                  render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger id="installmentId" className="w-full">
-                        <SelectValue />
+        {logged ? (
+          <>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <CheckCircle2 className="text-primary size-5" /> Receipt{" "}
+                {logged.receiptNumber}
+              </DialogTitle>
+              <DialogDescription>
+                ₹{logged.amount.toLocaleString("en-IN")} is on the ledger. Print
+                the receipt now, or open it any time from the payment history.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="mt-2 flex-col gap-2 sm:flex-row">
+              <Button asChild variant="outline">
+                <Link
+                  href={`/receipts/${logged.paymentId}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <Receipt /> View receipt
+                </Link>
+              </Button>
+              <Button asChild>
+                <Link
+                  href={`/receipts/${logged.paymentId}?print=1`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <Printer /> Print receipt
+                </Link>
+              </Button>
+              <Button variant="ghost" onClick={close}>
+                Done
+              </Button>
+            </DialogFooter>
+          </>
+        ) : (
+          <>
+            <DialogHeader>
+              <DialogTitle>Log payment</DialogTitle>
+              <DialogDescription>
+                Recorded with your name as collector — this becomes part of the
+                audit trail.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleSubmit(onSubmit)} noValidate>
+              <FieldGroup>
+                {isPicker && (
+                  <Field data-invalid={!!errors.studentId}>
+                    <FieldLabel htmlFor="studentId">Student</FieldLabel>
+                    <Select
+                      value={selectedStudentId}
+                      onValueChange={onStudentChange}
+                    >
+                      <SelectTrigger id="studentId" className="w-full">
+                        <SelectValue placeholder="Select a student" />
                       </SelectTrigger>
                       <SelectContent>
-                        {activeInstallments.map((i) => (
-                          <SelectItem key={i.id} value={i.id}>
-                            {i.label} — ₹{i.amount.toLocaleString("en-IN")}
+                        {pickable.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            {s.name} · ₹{s.balance.toLocaleString("en-IN")} due
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
-                  )}
-                />
-              </Field>
-            )}
-            <div className="grid grid-cols-2 gap-3">
-              <Field data-invalid={!!errors.amount}>
-                <FieldLabel htmlFor="amount">Amount</FieldLabel>
-                <Input id="amount" type="number" {...register("amount", { valueAsNumber: true })} />
-                <FieldError errors={errors.amount ? [errors.amount] : undefined} />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="mode">Mode</FieldLabel>
-                <Controller
-                  control={control}
-                  name="mode"
-                  render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger id="mode" className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {MODE_OPTIONS.map((m) => (
-                          <SelectItem key={m} value={m}>{m.replace("_", " ")}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-              </Field>
-            </div>
-            <Field data-invalid={!!errors.paidAt}>
-              <FieldLabel htmlFor="paidAt">Date</FieldLabel>
-              <Input id="paidAt" type="date" {...register("paidAt")} />
-              <FieldError errors={errors.paidAt ? [errors.paidAt] : undefined} />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="note">Note (optional)</FieldLabel>
-              <Textarea id="note" rows={2} {...register("note")} />
-            </Field>
-          </FieldGroup>
-          <DialogFooter className="mt-6">
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting && <Loader2 className="animate-spin" />}
-              Log payment
-            </Button>
-          </DialogFooter>
-        </form>
+                    <FieldError
+                      errors={errors.studentId ? [errors.studentId] : undefined}
+                    />
+                  </Field>
+                )}
+                {activeInstallments.length > 0 && (
+                  <Field>
+                    <FieldLabel htmlFor="installmentId">Installment</FieldLabel>
+                    <Controller
+                      control={control}
+                      name="installmentId"
+                      render={({ field }) => (
+                        <Select
+                          value={field.value}
+                          onValueChange={field.onChange}
+                        >
+                          <SelectTrigger id="installmentId" className="w-full">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {activeInstallments.map((i) => (
+                              <SelectItem key={i.id} value={i.id}>
+                                {i.label} — ₹{i.amount.toLocaleString("en-IN")}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
+                  </Field>
+                )}
+                <div className="grid grid-cols-2 gap-3">
+                  <Field data-invalid={!!errors.amount}>
+                    <FieldLabel htmlFor="amount">Amount</FieldLabel>
+                    <Input
+                      id="amount"
+                      type="number"
+                      {...register("amount", { valueAsNumber: true })}
+                    />
+                    <FieldError
+                      errors={errors.amount ? [errors.amount] : undefined}
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="mode">Mode</FieldLabel>
+                    <Controller
+                      control={control}
+                      name="mode"
+                      render={({ field }) => (
+                        <Select
+                          value={field.value}
+                          onValueChange={field.onChange}
+                        >
+                          <SelectTrigger id="mode" className="w-full">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {MODE_OPTIONS.map((m) => (
+                              <SelectItem key={m} value={m}>
+                                {m.replace("_", " ")}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
+                  </Field>
+                </div>
+                <Field data-invalid={!!errors.paidAt}>
+                  <FieldLabel htmlFor="paidAt">Date</FieldLabel>
+                  <Input id="paidAt" type="date" {...register("paidAt")} />
+                  <FieldError
+                    errors={errors.paidAt ? [errors.paidAt] : undefined}
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="note">Note (optional)</FieldLabel>
+                  <Textarea id="note" rows={2} {...register("note")} />
+                </Field>
+              </FieldGroup>
+              <DialogFooter className="mt-6">
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting && <Loader2 className="animate-spin" />}
+                  Log payment
+                </Button>
+              </DialogFooter>
+            </form>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );
