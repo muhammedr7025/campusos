@@ -45,10 +45,10 @@ If your browser/tooling doesn't support that, append `?tenant=acme` once — it'
 
 ## Project structure
 
-- `app/{admin,finance,crm,admissions,teacher,portal}/` — one literal URL-prefixed folder per role (not Next.js route groups — see note below), each behind `middleware.ts` role gating.
+- `app/{admin,finance,crm,admissions,teacher,portal}/` — one literal URL-prefixed folder per role (not Next.js route groups — see note below), each behind `proxy.ts` role gating.
 - `app/(auth)/login` — the one real route group, kept parenthesized so `/login` has no prefix.
 - `lib/rbac/` — `permissions.ts` (config-table RBAC, edge-safe), `guard.ts` (`requireRole`/`requirePermission`, the layer that actually enforces access).
-- `lib/tenant.ts` + `middleware.ts` — tenant resolution; every query goes through `getTenantId()`.
+- `lib/tenant.ts` + `proxy.ts` — tenant resolution; every query goes through `getTenantId()`.
 - `lib/storage/`, `lib/notifications/` — provider-agnostic interfaces (local filesystem / in-app DB are the only real V1 implementations; swap in S3/R2/SMS/WhatsApp later without touching call sites).
 - `lib/fees/balance.ts` — fee balance is always derived (`total − Σpayments`), never a stored editable field.
 - `prisma/schema.prisma` — full data model; `prisma/seed.ts` — demo data.
@@ -59,5 +59,8 @@ If your browser/tooling doesn't support that, append `?tenant=acme` once — it'
 
 - **No payment gateway, LMS, biometric attendance, exam/report cards, or alumni module** — explicit non-goals per the dev prompt.
 - **SMS/WhatsApp notifications**: stubbed via the `NotificationProvider` interface; only the in-app (DB-backed) implementation is wired up, per the PRD's note that this is a client budget decision.
-- **Time-based notification triggers** (fee due/overdue reminders, follow-up-due reminders, KYC-pending reminders) are surfaced as computed/filtered views in the relevant dashboards rather than pushed proactively — there's no background job scheduler in this build. Event-triggered notifications (assignment posted/graded, attendance-drop-on-marking) fire immediately.
+- **Time-based notification triggers** (fee due/overdue, follow-up due, KYC pending, assignment due soon) run from `lib/notifications/scheduled.ts`: opportunistically at most once an hour per institute whenever someone uses the app, and on demand via `POST /api/cron/reminders` with `Authorization: Bearer $CRON_SECRET` — point a cron job at it for punctual delivery. Every reminder is deduplicated, so running it often is safe. Event-triggered notifications (assignment posted/graded, attendance drop, exam result) fire immediately.
+- **Receipts**: every payment gets a sequential receipt number (`RCP-0001`) and a printable receipt at `/receipts/<paymentId>` — linked from the ledger, the student's fee page and the family's portal; `?print=1` opens the print dialog on load.
+- **Late fees** are derived from the fee structure's rule (flat per overdue installment, or a percentage of the overdue amount, after the grace period) every time a balance is shown — never stored.
+- **Deploying**: the container runs `prisma migrate deploy` before `next start`, so the schema is always current when the app comes up.
 - **Portal account provisioning**: student/parent accounts are created automatically at admission with a generated temp password shown once in the UI (no email/SMS delivery wired up yet — swap in a real provider before production use).

@@ -20,15 +20,18 @@ export type NotificationItem = {
   body: string;
   isRead: boolean;
   createdAt: string;
+  /** Where the notification leads, if anywhere (a receipt, say). */
+  href?: string | null;
 };
 
 export function NotificationBell({ notifications }: { notifications: NotificationItem[] }) {
   const router = useRouter();
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
-  async function onOpen(id: string) {
-    await markNotificationRead(id);
-    router.refresh();
+  async function onOpen(n: NotificationItem) {
+    if (!n.isRead) await markNotificationRead(n.id);
+    if (n.href) router.push(n.href);
+    else router.refresh();
   }
 
   async function onMarkAll() {
@@ -66,7 +69,7 @@ export function NotificationBell({ notifications }: { notifications: Notificatio
               <DropdownMenuItem
                 key={n.id}
                 className="flex flex-col items-start gap-0.5 whitespace-normal"
-                onSelect={() => !n.isRead && onOpen(n.id)}
+                onSelect={() => (n.href || !n.isRead) && onOpen(n)}
               >
                 <span className={`text-sm ${n.isRead ? "text-muted-foreground" : "font-medium"}`}>{n.title}</span>
                 <span className="text-muted-foreground text-xs">{n.body}</span>

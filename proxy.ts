@@ -29,6 +29,8 @@ const EXTRA_ALLOWED_ROLES: [prefix: string, roles: RoleValue[]][] = [
 ];
 
 /**
+ * Next 16 calls this file `proxy.ts` (formerly middleware.ts; same contract).
+ *
  * Resolves which tenant a request belongs to and forwards it downstream as
  * the `x-tenant-slug` header — this is the ONLY place tenant resolution
  * happens. Everything after this trusts the header, never the host again.
@@ -41,6 +43,8 @@ const EXTRA_ALLOWED_ROLES: [prefix: string, roles: RoleValue[]][] = [
  *     aren't practical, e.g. curl against bare localhost).
  *  3. `tenant` cookie, set the first time (2) is used, so it survives
  *     subsequent navigations without repeating the query param.
+ *  4. Otherwise the bare host is forwarded as `x-tenant-host`, and
+ *     getCurrentTenant matches it against a tenant's customDomain.
  */
 function resolveSubdomain(host: string): string | null {
   const hostname = host.split(":")[0];
@@ -49,8 +53,8 @@ function resolveSubdomain(host: string): string | null {
   if (hostname.endsWith(`.${rootHostname}`)) {
     return hostname.slice(0, -(rootHostname.length + 1));
   }
-  // Custom domain (production white-label): resolved by full hostname
-  // instead of a slug — handled by getCurrentTenant's customDomain lookup.
+  // Custom domain (production white-label): no slug; getCurrentTenant matches
+  // the forwarded host against Tenant.customDomain instead.
   return null;
 }
 
@@ -70,7 +74,7 @@ export default auth((req) => {
 
   // Route-group gating (layer 1 of 3 — UX only; server actions/queries in
   // lib/rbac/guard.ts are the layer that actually enforces this).
-  if (!PUBLIC_PATHS.includes(pathname) && !pathname.startsWith("/api/auth")) {
+  if (!PUBLIC_PATHS.includes(pathname) && !pathname.startsWith("/api/auth") && !pathname.startsWith("/api/cron")) {
     const matchedGroup = ROUTE_GROUP_PREFIXES.find(([prefix]) => pathname.startsWith(prefix));
     if (matchedGroup) {
       const [, group] = matchedGroup;

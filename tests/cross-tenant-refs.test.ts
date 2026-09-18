@@ -90,7 +90,7 @@ describe("references borrowed from another institute", () => {
     });
 
     expect(result.ok).toBe(false);
-    expect(await prisma.timetable.count()).toBe(0);
+    expect(await prisma.timetable.count({ where: { id: { not: f.timetableSlot.id } } })).toBe(0);
   });
 
   it("are refused when creating a fee structure", async () => {

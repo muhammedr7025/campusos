@@ -22,10 +22,15 @@ vi.mock("next/cache", () => ({
   revalidateTag: vi.fn(),
 }));
 
-vi.mock("@/lib/tenant", () => ({
-  getTenantId: async () => testActor.tenantId,
-  getCurrentTenant: async () => ({ id: testActor.tenantId, name: "Test Institute", subdomain: "test" }),
-}));
+vi.mock("@/lib/tenant", async () => {
+  // The real row, so settings columns (required KYC documents, say) reach the
+  // code under test exactly as they would from a request.
+  const { prisma } = await import("@/lib/prisma");
+  return {
+    getTenantId: async () => testActor.tenantId,
+    getCurrentTenant: async () => prisma.tenant.findUnique({ where: { id: testActor.tenantId } }),
+  };
+});
 
 vi.mock("@/lib/rbac/guard", async () => {
   const { roleHasPermission } = await import("@/lib/rbac/permissions");

@@ -4,9 +4,11 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { ENROLLED_STUDENT_WHERE } from "@/lib/academics/enrollment";
 import { getTenantId } from "@/lib/tenant";
-import { requirePermission, requireSession } from "@/lib/rbac/guard";
+import { requirePermission } from "@/lib/rbac/guard";
 import { writeAuditLog } from "@/lib/audit";
 import { storage } from "@/lib/storage";
+import { UPLOAD_RULES, uploadProblem } from "@/lib/storage/validate";
+import { assertTeaches } from "@/lib/academics/teaching";
 import { notifier } from "@/lib/notifications";
 import {
   assignmentSchema,
@@ -33,10 +35,13 @@ export async function createAssignment(formData: FormData): Promise<ActionResult
     });
 
     await assertOwned(tenantId, { division: data.divisionId, subject: data.subjectId });
+    await assertTeaches(tenantId, session.user, data.divisionId, data.subjectId);
 
-    const file = formData.get("attachment") as File | null;
+    const file = formData.get("attachment");
     let attachmentUrl: string | null = null;
-    if (file && file.size > 0) {
+    if (file instanceof File && file.size > 0) {
+      const problem = uploadProblem(file, UPLOAD_RULES.document);
+      if (problem) throw new BusinessRuleError(problem);
       const buffer = Buffer.from(await file.arrayBuffer());
       const stored = await storage.save({ tenantId, category: "assignments", buffer, filename: file.name, contentType: file.type });
       attachmentUrl = stored.url;
@@ -108,8 +113,18 @@ export async function gradeSubmission(input: unknown): Promise<ActionResult> {
     const submission = await prisma.$transaction(async (tx) => {
       const existing = await tx.submission.findFirstOrThrow({
         where: { id: data.submissionId, tenantId },
-        include: { student: { select: { userId: true } }, assignment: { select: { title: true } } },
+        include: {
+          student: { select: { userId: true } },
+          assignment: { select: { title: true, teacherId: true, divisionId: true, subjectId: true } },
+        },
       });
+      // The assignment's author, or whoever teaches that class now.
+      if (session.user.role !== Role.SUPER_ADMIN && existing.assignment.teacherId !== session.user.id) {
+        await assertTeaches(tenantId, session.user, existing.assignment.divisionId, existing.assignment.subjectId);
+      }
+      if (existing.status === "MISSING") {
+        throw new BusinessRuleError("Nothing has been submitted yet, so there's nothing to grade.");
+      }
 
       const updated = await tx.submission.update({
         where: { id: existing.id },
@@ -146,7 +161,7 @@ export async function gradeSubmission(input: unknown): Promise<ActionResult> {
 
 export async function submitAssignment(formData: FormData): Promise<ActionResult> {
   try {
-    const session = await requireSession();
+    const session = await requirePermission("submission:create");
     const tenantId = await getTenantId();
 
     const data = submitAssignmentSchema.parse({
@@ -161,10 +176,22 @@ export async function submitAssignment(formData: FormData): Promise<ActionResult
     if (submission.student.userId !== session.user.id) {
       return { ok: false, error: "You can only submit your own assignments." };
     }
+    // A grade closes the submission — resubmitting used to quietly drop it
+    // back to "submitted" with the old grade still attached.
+    if (submission.status === "GRADED") {
+      return { ok: false, error: "This assignment has already been graded and can't be resubmitted." };
+    }
 
-    const file = formData.get("file") as File | null;
+    const file = formData.get("file");
+    const hasFile = file instanceof File && file.size > 0;
+    if (!data.text?.trim() && !hasFile && !submission.fileUrl) {
+      return { ok: false, error: "Write your answer or attach a file before submitting." };
+    }
+
     let fileUrl: string | undefined;
-    if (file && file.size > 0) {
+    if (hasFile) {
+      const problem = uploadProblem(file, UPLOAD_RULES.document);
+      if (problem) return { ok: false, error: problem };
       const buffer = Buffer.from(await file.arrayBuffer());
       const stored = await storage.save({ tenantId, category: "submissions", buffer, filename: file.name, contentType: file.type });
       fileUrl = stored.url;
@@ -181,6 +208,9 @@ export async function submitAssignment(formData: FormData): Promise<ActionResult
         submittedAt: new Date(),
       },
     });
+    if (fileUrl && submission.fileUrl && submission.fileUrl !== fileUrl) {
+      await storage.delete(submission.fileUrl).catch(() => {});
+    }
 
     revalidatePath("/portal/assignments");
     return { ok: true, data: undefined };
@@ -234,6 +264,11 @@ export async function deleteAssignment(assignmentId: string): Promise<ActionResu
       return { ok: false, error: "You can only delete assignments you created." };
     }
 
+    const files = await prisma.submission.findMany({
+      where: { assignmentId, tenantId, fileUrl: { not: null } },
+      select: { fileUrl: true },
+    });
+
     await prisma.$transaction(async (tx) => {
       await tx.submission.deleteMany({ where: { assignmentId, tenantId } });
       await tx.assignment.delete({ where: { id: assignmentId } });
@@ -246,6 +281,11 @@ export async function deleteAssignment(assignmentId: string): Promise<ActionResu
         diff: { title: assignment.title },
       });
     });
+
+    // The rows are gone, so the files have no owner left.
+    for (const url of [assignment.attachmentUrl, ...files.map((f) => f.fileUrl)]) {
+      if (url) await storage.delete(url).catch(() => {});
+    }
 
     revalidatePath("/teacher/assignments");
     revalidatePath("/portal/assignments");

@@ -43,6 +43,13 @@ export const studentProfileSchema = z.object({
   address: z.string().optional(),
 });
 
+export const guardianProfileSchema = z.object({
+  name: z.string().min(2, "Name is required"),
+  phone: z.string().min(6, "Phone is required"),
+  email: z.email().optional().or(z.literal("")),
+  relationship: z.string().optional(),
+});
+
 export const studentStatusSchema = z.enum(["KYC_PENDING", "ACTIVE", "INACTIVE"]);
 
 export const reassignDivisionSchema = z.object({
@@ -54,4 +61,5 @@ export const reassignDivisionSchema = z.object({
 export type ConvertLeadInput = z.infer<typeof convertLeadSchema>;
 export type AdmitStudentInput = z.infer<typeof admitStudentSchema>;
 export type StudentProfileInput = z.infer<typeof studentProfileSchema>;
+export type GuardianProfileInput = z.infer<typeof guardianProfileSchema>;
 export type ReassignDivisionInput = z.infer<typeof reassignDivisionSchema>;

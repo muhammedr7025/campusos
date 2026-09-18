@@ -34,7 +34,10 @@ export default async function TeacherNotesPage() {
       orderBy: { name: "asc" },
     }),
     prisma.subject.findMany({
-      where: { tenantId, ...(myCourseIds ? { courseId: { in: myCourseIds } } : {}) },
+      where: {
+        tenantId,
+        ...(myCourseIds ? { courseId: { in: myCourseIds }, id: { in: [...new Set(myTimetable.map((t) => t.subjectId))] } } : {}),
+      },
       select: { id: true, name: true, courseId: true },
     }),
   ]);
@@ -74,7 +77,9 @@ export default async function TeacherNotesPage() {
                     )}
                   </div>
                 </div>
-                <DeleteNoteButton id={n.id} title={n.title} />
+                {(session.user.role === Role.SUPER_ADMIN || n.authorId === session.user.id) && (
+                  <DeleteNoteButton id={n.id} title={n.title} />
+                )}
               </CardContent>
             </Card>
           ))}

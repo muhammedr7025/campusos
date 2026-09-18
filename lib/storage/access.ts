@@ -8,8 +8,8 @@ export type StoredFileViewer = { id: string; role: Role };
 /**
  * Per-category read policy for stored files. Tenant isolation is checked by
  * the caller; this adds the rules a URL alone would otherwise bypass —
- * notably the notes fee-lock, which the portal page enforces visually and
- * which a student could otherwise walk around by opening the file URL.
+ * notably the notes fee-lock (overdue installments only, matching the portal
+ * page), which a student could otherwise walk around by opening the file URL.
  */
 export async function canReadStoredFile({
   tenantId,
@@ -40,5 +40,5 @@ export async function canReadStoredFile({
   if (note.courseId !== student.courseId) return false;
 
   const fees = await getCurrentFeePlanForStudent(tenantId, student.id);
-  return !fees || fees.balance <= 0;
+  return !fees || !fees.isOverdue;
 }

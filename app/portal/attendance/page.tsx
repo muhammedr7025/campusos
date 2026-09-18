@@ -1,5 +1,6 @@
 import { Users } from "lucide-react";
 import { requireRole } from "@/lib/rbac/guard";
+import { formatDateOnly } from "@/lib/academics/dates";
 import { getTenantId } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
 import { Role } from "@/generated/prisma/client";
@@ -71,7 +72,7 @@ export default async function PortalAttendancePage() {
           {records.slice(0, 20).map((r) => (
             <Card key={r.id}>
               <CardContent className="flex items-center justify-between p-3 text-sm">
-                <span>{r.subject.name} · {r.date.toLocaleDateString()}</span>
+                <span>{r.subject.name} · {formatDateOnly(r.date)}</span>
                 <Badge variant={r.status === "PRESENT" || r.status === "LATE" ? "default" : "destructive"}>{r.status}</Badge>
               </CardContent>
             </Card>

@@ -165,17 +165,18 @@
 }
 
 @media print {
-  body * {
-    visibility: hidden;
+  /* Receipts live on their own route with no shell, so printing needs only a
+     clean sheet: white paper, black ink, no page chrome. */
+  @page {
+    margin: 16mm;
   }
-  .receipt-printable,
-  .receipt-printable * {
-    visibility: visible;
+  html,
+  body {
+    background: #fff !important;
+    color: #000 !important;
   }
   .receipt-printable {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
+    color: #000;
+    break-inside: avoid;
   }
 }

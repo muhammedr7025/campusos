@@ -8,8 +8,12 @@ import { writeAuditLog } from "@/lib/audit";
 import { notifier } from "@/lib/notifications";
 import { markAttendanceSchema, ATTENDANCE_ALERT_THRESHOLD } from "@/lib/validators/attendance";
 import { ENROLLED_STUDENT_WHERE } from "@/lib/academics/enrollment";
+import { assertTeaches } from "@/lib/academics/teaching";
+import { DATE_ONLY_RE, dateOnlyToDb, localDateString } from "@/lib/academics/dates";
 import { BusinessRuleError } from "@/lib/actions/errors";
 import { actionError, type ActionResult } from "@/lib/actions/types";
+
+const DROP_ALERT_COOLDOWN_MS = 7 * 86_400_000;
 
 async function checkAttendanceDropAndNotify(tenantId: string, studentId: string) {
   const records = await prisma.attendance.findMany({ where: { tenantId, studentId }, select: { status: true } });
@@ -18,6 +22,7 @@ async function checkAttendanceDropAndNotify(tenantId: string, studentId: string)
   const present = records.filter((r) => r.status === "PRESENT" || r.status === "LATE").length;
   const percentage = Math.round((present / records.length) * 100);
   if (percentage >= ATTENDANCE_ALERT_THRESHOLD) return;
+
 
   const student = await prisma.student.findUnique({
     where: { id: studentId },
@@ -37,6 +42,8 @@ async function checkAttendanceDropAndNotify(tenantId: string, studentId: string)
         body: `${student.name}'s attendance is at ${percentage}%, below the ${ATTENDANCE_ALERT_THRESHOLD}% threshold.`,
         relatedEntityType: "Student",
         relatedEntityId: student.id,
+        // Once a week is a warning; once per absence is noise nobody reads.
+        dedupeKey: `ATTENDANCE_DROP:Student:${student.id}:${Math.floor(Date.now() / DROP_ALERT_COOLDOWN_MS)}`,
       }),
     ),
   );
@@ -58,6 +65,8 @@ export async function markAttendance(input: unknown): Promise<ActionResult> {
     ]);
     if (!division) throw new BusinessRuleError("That division isn't part of this institute.");
     if (!subject) throw new BusinessRuleError("That subject isn't part of this institute.");
+    await assertTeaches(tenantId, session.user, data.divisionId, data.subjectId);
+    if (!DATE_ONLY_RE.test(data.date)) throw new BusinessRuleError("Pick a valid date.");
 
     const roster = await prisma.student.findMany({
       where: { tenantId, divisionId: data.divisionId, ...ENROLLED_STUDENT_WHERE },
@@ -70,9 +79,11 @@ export async function markAttendance(input: unknown): Promise<ActionResult> {
       );
     }
 
-    const date = new Date(`${data.date}T00:00:00`);
-    const today = new Date(new Date().toDateString());
-    const isBackdated = date.getTime() !== today.getTime();
+    // Calendar dates compared as calendar dates: the sheet's day is the day
+    // the teacher picked, whatever time zone the server runs in.
+    const date = dateOnlyToDb(data.date);
+    const isBackdated = data.date !== localDateString();
+    if (data.date > localDateString()) throw new BusinessRuleError("Attendance can't be marked for a future date.");
 
     await prisma.$transaction(async (tx) => {
       for (const entry of data.entries) {

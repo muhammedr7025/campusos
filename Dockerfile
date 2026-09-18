@@ -36,4 +36,6 @@ COPY --from=builder /app/next.config.ts ./next.config.ts
 # they vanish with the container.
 RUN mkdir -p /app/storage
 EXPOSE 3000
-CMD ["npm", "start"]
+# Schema first, then serve: a deploy that ships a migration but never runs it
+# leaves the app querying columns the database doesn't have yet.
+CMD ["sh", "-c", "npx prisma migrate deploy && npm start"]

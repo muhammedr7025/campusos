@@ -26,6 +26,10 @@ model Tenant {
   secondaryColor String  @default("#F4F2ED")
   accentColor   String   @default("#C9821A")
   fontFamily    String?
+  // Which KYC documents block full admission (PRD §6.4: "configurable which
+  // docs are mandatory"). Every admission still opens a checklist row for all
+  // four standard documents; the ones not listed here are optional.
+  requiredKycDocs KycDocType[] @default([ID_PROOF, PHOTO, ADDRESS_PROOF, PREVIOUS_MARKSHEET])
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -670,6 +674,7 @@ enum NotificationType {
   ASSIGNMENT_GRADED
   ANNOUNCEMENT
   EXAM_RESULT_PUBLISHED
+  PAYMENT_RECEIVED
 }
 
 model Notification {
@@ -684,8 +689,13 @@ model Notification {
   isRead           Boolean           @default(false)
   relatedEntityType String?
   relatedEntityId  String?
+  // Set on reminders that must go out at most once (per period). The unique
+  // index makes that true even when two runs overlap — a read-then-insert
+  // check can't, and didn't.
+  dedupeKey        String?
   createdAt        DateTime          @default(now())
 
+  @@unique([recipientId, dedupeKey])
   @@index([tenantId, recipientId, isRead])
   @@map("notifications")
 }

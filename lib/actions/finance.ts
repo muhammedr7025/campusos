@@ -6,7 +6,7 @@ import { getTenantId } from "@/lib/tenant";
 import { requirePermission } from "@/lib/rbac/guard";
 import { writeAuditLog } from "@/lib/audit";
 import { notifier } from "@/lib/notifications";
-import { getFeeSummaryForTenant } from "@/lib/fees/balance";
+import { getFeeSummaryForTenant, computeLateFee } from "@/lib/fees/balance";
 import {
   feeStructureSchema,
   paymentSchema,
@@ -69,29 +69,37 @@ export async function createFeeStructure(input: unknown): Promise<ActionResult<{
 /**
  * Next receipt number for a tenant, e.g. RCP-0007. Derived from the highest
  * existing number rather than a row count, so deleting nothing and reversing
- * anything can't hand out a number twice. The unique index on
+ * anything can't hand out a number twice. Compared as numbers, not strings —
+ * "RCP-10000" sorts before "RCP-9999" as text. The unique index on
  * (tenantId, receiptNumber) is the real backstop.
  */
 async function nextReceiptNumber(tx: Prisma.TransactionClient, tenantId: string): Promise<string> {
-  const latest = await tx.payment.findFirst({
+  const issued = await tx.payment.findMany({
     where: { tenantId, correctionOfId: null, receiptNumber: { startsWith: "RCP-" } },
-    orderBy: { receiptNumber: "desc" },
     select: { receiptNumber: true },
   });
-  const previous = latest?.receiptNumber ? Number.parseInt(latest.receiptNumber.slice(4), 10) : 0;
-  return `RCP-${String((Number.isNaN(previous) ? 0 : previous) + 1).padStart(4, "0")}`;
+  const highest = issued.reduce((max, p) => {
+    const n = Number.parseInt(p.receiptNumber!.slice(4), 10);
+    return Number.isFinite(n) && n > max ? n : max;
+  }, 0);
+  return `RCP-${String(highest + 1).padStart(4, "0")}`;
 }
 
-export async function logPayment(input: unknown): Promise<ActionResult> {
+export type LogPaymentResult = { paymentId: string; receiptNumber: string };
+
+export async function logPayment(input: unknown): Promise<ActionResult<LogPaymentResult>> {
   try {
     const session = await requirePermission("payment:create");
     const tenantId = await getTenantId();
     const data = paymentSchema.parse(input);
 
-    await prisma.$transaction(async (tx) => {
+    const created = await prisma.$transaction(async (tx) => {
       const plan = await tx.feePlan.findFirstOrThrow({
         where: { id: data.feePlanId, tenantId, studentId: data.studentId },
-        include: { installments: { select: { id: true } } },
+        include: {
+          installments: { select: { id: true, amount: true, dueDate: true, sequence: true } },
+          feeStructure: { select: { lateFeeType: true, lateFeeValue: true, gracePeriodDays: true } },
+        },
       });
 
       if (data.installmentId && !plan.installments.some((i) => i.id === data.installmentId)) {
@@ -102,17 +110,20 @@ export async function logPayment(input: unknown): Promise<ActionResult> {
       // rather than trusting anything the client sent. Payments are summed per
       // student, not per plan: an approved discount supersedes the plan, and
       // money paid under the old one still counts (see getFeeSummaryForTenant).
+      // Any late fee the plan has accrued is payable on top of the balance.
       const priorPayments = await tx.payment.findMany({
         where: { tenantId, studentId: data.studentId },
         select: { amount: true },
       });
       const paid = priorPayments.reduce((sum, p) => sum + Number(p.amount), 0);
-      const outstanding = Number(plan.totalAmount) - paid;
-      if (data.amount > outstanding) {
+      const balance = Number(plan.totalAmount) - paid;
+      const lateFee = balance > 0 ? computeLateFee(plan.installments, paid, plan.feeStructure) : 0;
+      const outstanding = balance + lateFee;
+      if (data.amount > outstanding + 0.005) {
         throw new BusinessRuleError(
           outstanding <= 0
             ? "This fee plan is already settled in full."
-            : `That's more than the ₹${outstanding.toLocaleString("en-IN")} outstanding on this plan.`,
+            : `That's more than the ₹${outstanding.toLocaleString("en-IN")} outstanding on this plan${lateFee > 0 ? ` (including ₹${lateFee.toLocaleString("en-IN")} late fee)` : ""}.`,
         );
       }
 
@@ -137,14 +148,37 @@ export async function logPayment(input: unknown): Promise<ActionResult> {
         action: "CREATE",
         entityType: "Payment",
         entityId: payment.id,
-        diff: { amount: data.amount, mode: data.mode },
+        diff: { amount: data.amount, mode: data.mode, receiptNumber: payment.receiptNumber },
       });
+
+      return payment;
     });
+
+    // The family hears about it with the receipt number, and can print the
+    // receipt from their own portal.
+    const student = await prisma.student.findFirst({
+      where: { id: data.studentId, tenantId },
+      select: { name: true, userId: true, guardians: { select: { guardian: { select: { userId: true } } } } },
+    });
+    const recipients = student
+      ? [student.userId, ...student.guardians.map((g) => g.guardian.userId)].filter((id): id is string => !!id)
+      : [];
+    await Promise.all(
+      recipients.map((recipientId) =>
+        notifier.send(tenantId, recipientId, "PAYMENT_RECEIVED", {
+          title: `Payment received — ${created.receiptNumber}`,
+          body: `₹${data.amount.toLocaleString("en-IN")} received for ${student!.name}. The receipt is under Fees & receipts.`,
+          relatedEntityType: "Payment",
+          relatedEntityId: created.id,
+        }),
+      ),
+    );
 
     revalidatePath(`/finance/payments/${data.studentId}`);
     revalidatePath("/finance/dues");
     revalidatePath("/finance/payments");
-    return { ok: true, data: undefined };
+    revalidatePath("/portal/fees");
+    return { ok: true, data: { paymentId: created.id, receiptNumber: created.receiptNumber! } };
   } catch (error) {
     return actionError(error);
   }

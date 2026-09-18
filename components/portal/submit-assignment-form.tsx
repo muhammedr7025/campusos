@@ -39,7 +39,8 @@ export function SubmitAssignmentForm({ submissionId, defaultText }: { submission
         </Field>
         <Field>
           <FieldLabel htmlFor="file">Attach a file (optional)</FieldLabel>
-          <Input id="file" name="file" type="file" />
+          <Input id="file" name="file" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.txt,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.zip" />
+          <p className="text-muted-foreground text-xs">PDF, image, Office document, text or ZIP — up to 20 MB.</p>
         </Field>
       </FieldGroup>
       <Button type="submit" className="mt-4 w-full" disabled={submitting}>

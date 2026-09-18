@@ -14,8 +14,11 @@ export async function createStaffUser(input: unknown): Promise<ActionResult<{ em
     const session = await requirePermission("user:manage");
     const tenantId = await getTenantId();
     const data = createUserSchema.parse(input);
+    // Sign-in looks the address up lowercased, so it has to be stored that way
+    // — "Jane@Acme.com" would otherwise be an account nobody can log into.
+    const email = data.email.trim().toLowerCase();
 
-    const existing = await prisma.user.findUnique({ where: { tenantId_email: { tenantId, email: data.email } } });
+    const existing = await prisma.user.findUnique({ where: { tenantId_email: { tenantId, email } } });
     if (existing) return { ok: false, error: "A user with this email already exists." };
 
     const password = generateTempPassword();
@@ -23,7 +26,7 @@ export async function createStaffUser(input: unknown): Promise<ActionResult<{ em
 
     const user = await prisma.$transaction(async (tx) => {
       const created = await tx.user.create({
-        data: { tenantId, email: data.email, name: data.name, phone: data.phone || null, role: data.role, passwordHash },
+        data: { tenantId, email, name: data.name, phone: data.phone || null, role: data.role, passwordHash },
       });
       await writeAuditLog(tx, {
         tenantId,
@@ -31,7 +34,7 @@ export async function createStaffUser(input: unknown): Promise<ActionResult<{ em
         action: "CREATE",
         entityType: "User",
         entityId: created.id,
-        diff: { email: data.email, role: data.role },
+        diff: { email, role: data.role },
       });
       return created;
     });

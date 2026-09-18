@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/layout/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { DAY_LABELS } from "@/lib/validators/timetable";
+import { localDateString } from "@/lib/academics/dates";
 
 export default async function TeacherAttendancePage() {
   const session = await requireRole(Role.SUPER_ADMIN, Role.TEACHER);
@@ -20,7 +21,7 @@ export default async function TeacherAttendancePage() {
     orderBy: [{ dayOfWeek: "asc" }, { startTime: "asc" }],
   });
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateString();
   const todayDow = new Date().getDay();
 
   return (

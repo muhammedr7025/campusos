@@ -47,6 +47,15 @@ export default async function SubmitAssignmentPage({ params }: { params: Promise
               View assignment attachment
             </a>
           )}
+          {submission.fileUrl && (
+            <p className="text-muted-foreground mb-4 text-sm">
+              Currently attached:{" "}
+              <a href={submission.fileUrl} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+                your submitted file
+              </a>
+              . Attaching another replaces it.
+            </p>
+          )}
           <SubmitAssignmentForm submissionId={submission.id} defaultText={submission.text} />
         </CardContent>
       </Card>

@@ -72,9 +72,24 @@ export async function seedFixture() {
     include: { installments: { orderBy: { sequence: "asc" } } },
   });
 
+  // The teacher's one class. Acting for a division/subject means having it on
+  // the timetable, so every teacher-role test gets this pairing to act on. A
+  // Friday dawn slot, out of the way of the conflict tests' Monday mornings.
+  const timetableSlot = await prisma.timetable.create({
+    data: {
+      tenantId: tenant.id,
+      divisionId: division.id,
+      subjectId: subject.id,
+      teacherId: teacher.id,
+      dayOfWeek: 5,
+      startTime: "07:00",
+      endTime: "07:45",
+    },
+  });
+
   setTestActor({ id: admin.id, role: "SUPER_ADMIN", tenantId: tenant.id });
 
-  return { tenant, admin, finance, counselor, admissions, teacher, batch, course, subject, division, feeStructure };
+  return { tenant, admin, finance, counselor, admissions, teacher, batch, course, subject, division, feeStructure, timetableSlot };
 }
 
 /** Creates an enrolled student (no portal user / guardian) for tests that just need a roster row. */

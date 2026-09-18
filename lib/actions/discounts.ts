@@ -8,6 +8,7 @@ import { writeAuditLog } from "@/lib/audit";
 import { getCurrentFeePlanForStudent } from "@/lib/fees/balance";
 import { discountRequestSchema } from "@/lib/validators/discounts";
 import { assertOwned } from "@/lib/rbac/ownership";
+import { BusinessRuleError } from "@/lib/actions/errors";
 import { actionError, type ActionResult } from "@/lib/actions/types";
 
 export async function requestDiscount(input: unknown): Promise<ActionResult<{ id: string }>> {
@@ -64,14 +65,30 @@ export async function decideDiscount(discountId: string, approve: boolean): Prom
     }
 
     await prisma.$transaction(async (tx) => {
+      // Re-checked inside the transaction so two admins deciding at once can't
+      // both approve — the second sees the first's decision.
+      const fresh = await tx.discountRequest.findUniqueOrThrow({ where: { id: discountId }, select: { status: true } });
+      if (fresh.status !== "PENDING") throw new BusinessRuleError("This request has already been decided.");
+
       await tx.discountRequest.update({
         where: { id: discountId },
         data: { status: approve ? "APPROVED" : "REJECTED", decidedById: session.user.id, decidedAt: new Date() },
       });
 
       if (approve) {
-        const current = await getCurrentFeePlanForStudent(tenantId, request.studentId);
-        if (current) {
+        // Read through the transaction, not the global client.
+        const current = await getCurrentFeePlanForStudent(tenantId, request.studentId, tx);
+        // Approving a discount for someone with nothing to discount used to
+        // succeed silently and change nothing — the approver never knew.
+        if (!current) {
+          throw new BusinessRuleError("This student has no fee plan yet, so there's nothing to discount. Set one up first.");
+        }
+        if (Number(request.amount) > current.balance) {
+          throw new BusinessRuleError(
+            `The discount (₹${Number(request.amount).toLocaleString("en-IN")}) is more than the ₹${current.balance.toLocaleString("en-IN")} still owed.`,
+          );
+        }
+        {
           const discount = Number(request.amount);
           const newTotal = Math.max(0, current.total - discount);
           let remaining = discount;

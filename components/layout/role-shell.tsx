@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { requirePageSession } from "@/lib/rbac/guard";
+import { maybeRunScheduledNotifications } from "@/lib/notifications/scheduled";
 import { getCurrentTenant, getTenantId } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
 import { AppShell } from "@/components/layout/app-shell";
@@ -28,6 +30,9 @@ export async function RoleShell({ children }: { children: React.ReactNode }) {
   const effectiveGroupLabel = GROUP_LABEL[effectiveGroup];
 
   const tenantId = await getTenantId();
+  // Time-based reminders piggyback on ordinary traffic, after the response
+  // has gone out, so they cost the visitor nothing.
+  after(() => maybeRunScheduledNotifications(tenantId));
   const enableCommandPalette = ["admin", "finance", "crm"].includes(effectiveGroup);
   const notifications = await prisma.notification.findMany({
     where: { tenantId, recipientId: session.user.id },
@@ -51,6 +56,7 @@ export async function RoleShell({ children }: { children: React.ReactNode }) {
         body: n.body,
         isRead: n.isRead,
         createdAt: n.createdAt.toISOString(),
+        href: n.relatedEntityType === "Payment" && n.relatedEntityId ? `/receipts/${n.relatedEntityId}` : null,
       }))}
     >
       {children}

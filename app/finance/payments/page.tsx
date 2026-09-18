@@ -1,14 +1,17 @@
+import Link from "next/link";
 import { requireRole } from "@/lib/rbac/guard";
-import { getCurrentTenant, getTenantId } from "@/lib/tenant";
+import { getTenantId } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
 import { Role } from "@/generated/prisma/client";
 import { getFeeSummaryForTenant } from "@/lib/fees/balance";
 import { PageHeader } from "@/components/layout/page-header";
+import { Button } from "@/components/ui/button";
 import { FilterPills } from "@/components/layout/filter-pills";
 import { PaymentsLedgerTable, type LedgerRow } from "@/components/finance/payments-ledger-table";
 import { LogPaymentDialog, type PayableStudent } from "@/components/finance/log-payment-dialog";
 
 const MODES = ["All", "CASH", "UPI", "BANK_TRANSFER", "CHEQUE", "OTHER"] as const;
+const PAGE_SIZE = 200;
 
 export default async function PaymentsLedgerPage({
   searchParams,
@@ -17,21 +20,26 @@ export default async function PaymentsLedgerPage({
 }) {
   await requireRole(Role.SUPER_ADMIN, Role.FINANCE);
   const tenantId = await getTenantId();
-  const tenant = await getCurrentTenant();
   const params = await searchParams;
   const mode = (MODES as readonly string[]).includes(params.mode ?? "") ? params.mode! : "All";
+  const page = Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1);
+  const where = { tenantId, ...(mode === "All" ? {} : { mode: mode as never }) };
 
-  const [payments, plans, planRows] = await Promise.all([
+  // The ledger used to stop at the latest 100 entries with no way to see
+  // anything older; it pages instead.
+  const [payments, totalCount, plans, planRows] = await Promise.all([
     prisma.payment.findMany({
-      where: { tenantId, ...(mode === "All" ? {} : { mode: mode as never }) },
+      where,
       include: {
         student: { select: { id: true, name: true, enrollmentNumber: true } },
         collectedBy: { select: { name: true } },
         corrections: { select: { id: true } },
       },
       orderBy: { createdAt: "desc" },
-      take: 100,
+      take: PAGE_SIZE,
+      skip: (page - 1) * PAGE_SIZE,
     }),
+    prisma.payment.count({ where }),
     getFeeSummaryForTenant(tenantId),
     prisma.feePlan.findMany({
       where: { tenantId },
@@ -62,7 +70,7 @@ export default async function PaymentsLedgerPage({
 
   const planByStudent = new Map(planRows.map((p) => [p.studentId, p]));
   const payable: PayableStudent[] = plans
-    .filter((p) => p.balance > 0)
+    .filter((p) => p.totalDue > 0)
     .map((p) => {
       const plan = planByStudent.get(p.studentId);
       return {
@@ -70,7 +78,7 @@ export default async function PaymentsLedgerPage({
         name: p.studentName,
         enrollmentNumber: p.enrollmentNumber,
         feePlanId: p.feePlanId,
-        balance: p.balance,
+        balance: p.totalDue,
         installments: (plan?.installments ?? []).map((i) => ({
           id: i.id,
           label: i.label,
@@ -91,7 +99,27 @@ export default async function PaymentsLedgerPage({
 
       <FilterPills options={[...MODES]} active={mode} paramKey="mode" />
 
-      <PaymentsLedgerTable rows={rows} tenantName={tenant?.name ?? "Institute"} />
+      <PaymentsLedgerTable rows={rows} />
+
+      {totalCount > PAGE_SIZE && (
+        <div className="flex items-center justify-between gap-3 text-sm">
+          <span className="text-muted-foreground">
+            Entries {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, totalCount)} of {totalCount}
+          </span>
+          <div className="flex gap-2">
+            {page > 1 && (
+              <Button asChild variant="outline" size="sm">
+                <Link href={{ query: { ...(mode !== "All" ? { mode } : {}), page: page - 1 } }}>Newer</Link>
+              </Button>
+            )}
+            {page * PAGE_SIZE < totalCount && (
+              <Button asChild variant="outline" size="sm">
+                <Link href={{ query: { ...(mode !== "All" ? { mode } : {}), page: page + 1 } }}>Older</Link>
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

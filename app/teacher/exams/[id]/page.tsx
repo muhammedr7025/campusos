@@ -4,6 +4,7 @@ import { getTenantId } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
 import { ENROLLED_STUDENT_WHERE } from "@/lib/academics/enrollment";
 import { Role } from "@/generated/prisma/client";
+import { teachesClass } from "@/lib/academics/teaching";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/layout/empty-state";
 import { Users } from "lucide-react";
@@ -11,7 +12,7 @@ import { MarksRoster } from "@/components/teacher/marks-roster";
 
 export default async function ExamMarksPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  await requireRole(Role.SUPER_ADMIN, Role.TEACHER);
+  const session = await requireRole(Role.SUPER_ADMIN, Role.TEACHER);
   const tenantId = await getTenantId();
 
   const exam = await prisma.exam.findFirst({
@@ -23,6 +24,9 @@ export default async function ExamMarksPage({ params }: { params: Promise<{ id: 
     },
   });
   if (!exam) notFound();
+  if (session.user.role !== Role.SUPER_ADMIN && !(await teachesClass(tenantId, session.user.id, exam.divisionId, exam.subjectId))) {
+    notFound();
+  }
 
   const students = await prisma.student.findMany({
     where: { tenantId, divisionId: exam.divisionId, ...ENROLLED_STUDENT_WHERE },

@@ -48,21 +48,41 @@ export default async function PortalAssignmentsPage() {
         <EmptyState icon={FileText} title="No assignments yet" />
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {submissions.map((s) => (
-            <Link key={s.id} href={s.status === "MISSING" || s.status === "LATE" ? `/portal/assignments/${s.assignment.id}/submit` : "#"}>
-              <Card className={s.status !== "GRADED" ? "hover:border-primary/50 transition-colors" : undefined}>
+          {submissions.map((s) => {
+            // Only the student hands work in, and only until it's graded.
+            const canSubmit = session.user.role === Role.STUDENT && s.status !== "GRADED";
+            const card = (
+              <Card className={canSubmit ? "hover:border-primary/50 h-full transition-colors" : "h-full"}>
                 <CardContent className="flex flex-col gap-2 p-4">
                   <p className="font-medium">{s.assignment.title}</p>
                   <p className="text-muted-foreground text-sm">{s.assignment.subject.name}</p>
                   <p className="text-muted-foreground text-xs">Due {s.assignment.dueDate.toLocaleDateString()}</p>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <Badge variant={STATUS_VARIANT[s.status]}>{s.status}</Badge>
-                    {s.grade && <Badge variant="outline">{s.grade}</Badge>}
+                    {s.grade && <Badge variant="outline">Grade: {s.grade}</Badge>}
+                    {s.fileUrl && !canSubmit && (
+                      <a href={s.fileUrl} target="_blank" rel="noreferrer" className="text-primary text-xs hover:underline">
+                        Submitted file
+                      </a>
+                    )}
                   </div>
+                  {s.feedback && (
+                    <p className="text-muted-foreground border-l-2 pl-2 text-xs italic">“{s.feedback}”</p>
+                  )}
+                  {canSubmit && (
+                    <p className="text-primary text-xs">{s.status === "MISSING" ? "Submit →" : "Update submission →"}</p>
+                  )}
                 </CardContent>
               </Card>
-            </Link>
-          ))}
+            );
+            return canSubmit ? (
+              <Link key={s.id} href={`/portal/assignments/${s.assignment.id}/submit`}>
+                {card}
+              </Link>
+            ) : (
+              <div key={s.id}>{card}</div>
+            );
+          })}
         </div>
       )}
     </div>

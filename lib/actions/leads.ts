@@ -14,7 +14,37 @@ import {
   type BulkImportRow,
 } from "@/lib/validators/leads";
 import { assertOwned } from "@/lib/rbac/ownership";
+import { BusinessRuleError } from "@/lib/actions/errors";
 import { actionError, type ActionResult } from "@/lib/actions/types";
+
+const digitsOf = (value: string) => value.replace(/[^0-9]/g, "");
+
+/**
+ * The person behind a phone number, if the institute already knows them: an
+ * open enquiry or an admitted student. Bulk import has always checked this;
+ * the one-at-a-time form didn't, so the same walk-in could be entered twice
+ * and chased by two counselors.
+ */
+async function findExistingByPhone(tenantId: string, phone: string, excludeLeadId?: string) {
+  const digits = digitsOf(phone);
+  if (digits.length < 6) return null;
+  const tail = digits.slice(-Math.min(10, digits.length));
+  const [leads, students] = await Promise.all([
+    prisma.lead.findMany({
+      where: { tenantId, phone: { contains: tail.slice(-4) }, status: { not: "LOST" }, ...(excludeLeadId ? { id: { not: excludeLeadId } } : {}) },
+      select: { id: true, name: true, phone: true, status: true },
+    }),
+    prisma.student.findMany({
+      where: { tenantId, phone: { contains: tail.slice(-4) } },
+      select: { id: true, name: true, phone: true, enrollmentNumber: true },
+    }),
+  ]);
+  const lead = leads.find((l) => digitsOf(l.phone).endsWith(tail));
+  if (lead) return { kind: "lead" as const, ...lead };
+  const student = students.find((s) => digitsOf(s.phone ?? "").endsWith(tail));
+  if (student) return { kind: "student" as const, ...student };
+  return null;
+}
 
 export async function createLead(input: unknown): Promise<ActionResult<{ id: string }>> {
   try {
@@ -23,6 +53,15 @@ export async function createLead(input: unknown): Promise<ActionResult<{ id: str
     const data = leadSchema.parse(input);
 
     await assertOwned(tenantId, { course: data.interestedCourseId, user: data.assignedCounselorId });
+
+    const existing = await findExistingByPhone(tenantId, data.phone);
+    if (existing) {
+      throw new BusinessRuleError(
+        existing.kind === "lead"
+          ? `${existing.name} already has an open enquiry with this phone number (${existing.status.toLowerCase().replace("_", " ")}). Log a follow-up on it instead.`
+          : `${existing.name} (${existing.enrollmentNumber}) is already an admitted student with this phone number.`,
+      );
+    }
 
     const lead = await prisma.$transaction(async (tx) => {
       const created = await tx.lead.create({
@@ -62,6 +101,9 @@ export async function logFollowUp(input: unknown): Promise<ActionResult> {
 
     await prisma.$transaction(async (tx) => {
       const lead = await tx.lead.findFirstOrThrow({ where: { id: data.leadId, tenantId } });
+      if (lead.status === "CONVERTED") {
+        throw new BusinessRuleError("This enquiry has been converted — the student record is where their history continues.");
+      }
 
       await tx.followUp.create({
         data: {
@@ -75,11 +117,11 @@ export async function logFollowUp(input: unknown): Promise<ActionResult> {
         },
       });
 
-      // Logging a follow-up is meaningful pipeline activity — nudge status
-      // forward automatically unless already further along.
+      // Logging a follow-up is meaningful pipeline activity — a first contact
+      // moves a new enquiry forward. Anything further along stays where the
+      // counselor put it; a follow-up on a FOLLOW_UP lead is exactly what that
+      // stage means, not a reason to move it back to CONTACTED.
       if (lead.status === "NEW") {
-        await tx.lead.update({ where: { id: lead.id }, data: { status: "CONTACTED" } });
-      } else if (lead.status === "FOLLOW_UP") {
         await tx.lead.update({ where: { id: lead.id }, data: { status: "CONTACTED" } });
       }
     });
@@ -100,11 +142,19 @@ export async function changeLeadStage(input: unknown): Promise<ActionResult> {
 
     await prisma.$transaction(async (tx) => {
       const lead = await tx.lead.findFirstOrThrow({ where: { id: data.leadId, tenantId } });
-      await tx.lead.update({ where: { id: lead.id }, data: { status: data.status } });
+      // A converted enquiry is a student now; dragging it back onto the board
+      // would let it be converted twice. A lost one may be reopened.
+      if (lead.status === "CONVERTED") {
+        throw new BusinessRuleError("This enquiry has already been converted to a student and can't be moved.");
+      }
+      await tx.lead.update({
+        where: { id: lead.id },
+        data: { status: data.status, ...(lead.status === "LOST" ? { lostReason: null } : {}) },
+      });
       await writeAuditLog(tx, {
         tenantId,
         actorId: session.user.id,
-        action: "UPDATE_STATUS",
+        action: lead.status === "LOST" ? "REOPEN" : "UPDATE_STATUS",
         entityType: "Lead",
         entityId: lead.id,
         diff: { from: lead.status, to: data.status },
@@ -157,8 +207,16 @@ export async function updateLead(leadId: string, input: unknown): Promise<Action
 
     await assertOwned(tenantId, { course: data.interestedCourseId, user: data.assignedCounselorId });
 
+    const existing = await findExistingByPhone(tenantId, data.phone, leadId);
+    if (existing && existing.kind === "lead") {
+      throw new BusinessRuleError(`${existing.name} already has an open enquiry with this phone number.`);
+    }
+
     await prisma.$transaction(async (tx) => {
       const before = await tx.lead.findFirstOrThrow({ where: { id: leadId, tenantId } });
+      if (before.status === "CONVERTED") {
+        throw new BusinessRuleError("This enquiry has been converted — edit the student's profile instead.");
+      }
       await tx.lead.update({
         where: { id: leadId },
         data: {

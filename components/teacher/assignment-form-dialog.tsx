@@ -21,7 +21,8 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { createAssignment } from "@/lib/actions/assignments";
 
 type DivisionOption = { id: string; name: string; courseId: string };
-type SubjectOption = { id: string; name: string; courseId: string };
+/** `divisionId` narrows a subject to one class — a teacher may take Physics in A but not in B. */
+type SubjectOption = { id: string; name: string; courseId: string; divisionId?: string };
 
 export function AssignmentFormDialog({ divisions, subjects }: { divisions: DivisionOption[]; subjects: SubjectOption[] }) {
   const [open, setOpen] = useState(false);
@@ -31,7 +32,10 @@ export function AssignmentFormDialog({ divisions, subjects }: { divisions: Divis
   const router = useRouter();
 
   const courseId = divisions.find((d) => d.id === divisionId)?.courseId;
-  const availableSubjects = useMemo(() => subjects.filter((s) => s.courseId === courseId), [subjects, courseId]);
+  const availableSubjects = useMemo(
+    () => subjects.filter((s) => s.courseId === courseId && (!s.divisionId || s.divisionId === divisionId)),
+    [subjects, courseId, divisionId],
+  );
 
   async function onSubmit(formData: FormData) {
     if (!divisionId || !subjectId) {
@@ -98,7 +102,8 @@ export function AssignmentFormDialog({ divisions, subjects }: { divisions: Divis
             </Field>
             <Field>
               <FieldLabel htmlFor="attachment">Attachment (optional)</FieldLabel>
-              <Input id="attachment" name="attachment" type="file" />
+              <Input id="attachment" name="attachment" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.txt,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.zip" />
+              <p className="text-muted-foreground text-xs">PDF, image, Office document, text or ZIP — up to 20 MB.</p>
             </Field>
           </FieldGroup>
           <DialogFooter className="mt-6">
